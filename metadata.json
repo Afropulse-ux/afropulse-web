@@ -1,0 +1,6 @@
+{
+  "name": "Afropulse - African Entertainment Portal",
+  "description": "The Leader in African Entertainment. Stream trending Afrobeat tracks, celebrity news, free producer beats, and movie trailers.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
