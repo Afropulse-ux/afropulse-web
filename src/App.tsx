@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from "react";
 import { createClient } from "@supabase/supabase-js";
 
-// Initialize Supabase Client dynamically using environment variables
-const supabaseUrl = process.env.REACT_APP_SUPABASE_URL || process.env.VITE_SUPABASE_URL || "";
-const supabaseKey = process.env.REACT_APP_SUPABASE_ANON_KEY || process.env.VITE_SUPABASE_ANON_KEY || "";
+// Initialize Supabase Client securely using Vite's correct import.meta.env
+const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || "";
+const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY || "";
 const supabase = createClient(supabaseUrl, supabaseKey);
 
 // Core Jaguda / MusicHub Style Service Categories
