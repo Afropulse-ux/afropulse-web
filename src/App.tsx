@@ -1,10 +1,11 @@
 import React, { useState, useEffect } from "react";
 import { createClient } from "@supabase/supabase-js";
 
-// Initialize Supabase Client securely using Vite's correct import.meta.env
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || "";
-const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY || "";
+// Initialize Supabase Client safely to prevent runtime crashes if variables are missing
+const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || "https://placeholder.supabase.co";
+const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY || "placeholder-key";
 const supabase = createClient(supabaseUrl, supabaseKey);
+
 
 // Core Jaguda / MusicHub Style Service Categories
 const SERVICES = [
