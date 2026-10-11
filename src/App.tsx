@@ -1,12 +1,12 @@
 import React, { useState, useEffect } from "react";
 import { createClient } from "@supabase/supabase-js";
 
-// Initialize Supabase Client securely with fallback placeholders to prevent crashes
+// Initialize Supabase Client securely with fallback placeholders
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || "https://placeholder.supabase.co";
 const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY || "placeholder-key";
 const supabase = createClient(supabaseUrl, supabaseKey);
 
-// Core Jaguda / MusicHub Style Service Categories
+// Core Service Categories
 const SERVICES = [
   { name: "Music", href: "/category/music" },
   { name: "News & Gossip", href: "/category/news" },
@@ -25,7 +25,7 @@ export default function App() {
   const [headerAd, setHeaderAd] = useState<any>(null);
   const [selectedBeat, setSelectedBeat] = useState<any>(null);
 
-  // Load Real Supabase Data
+  // Load Supabase Data safely
   useEffect(() => {
     async function loadData() {
       try {
@@ -121,7 +121,7 @@ export default function App() {
           </div>
         )}
 
-        {/* 2. PADDED BRAND SERVICE CATEGORY BOXES */}
+        {/* 2. BRAND SERVICE CATEGORY BOXES */}
         <nav className="w-full overflow-x-auto pb-2 scrollbar-none">
           <div className="flex items-center gap-2 min-w-max">
             {SERVICES.map((srv, idx) => (
@@ -136,7 +136,7 @@ export default function App() {
           </div>
         </nav>
 
-        {/* 3. COMPACT #1 TRENDING TRACK (HERO MANAGER) */}
+        {/* 3. #1 TRENDING TRACK (HERO MANAGER) */}
         {heroTrack && (
           <section className="w-full bg-gradient-to-r from-[#181818] to-[#121212] border border-emerald-500/30 rounded-xl p-4 flex flex-col sm:flex-row items-center justify-between gap-4">
             <div className="flex items-center gap-4 w-full sm:w-auto">
@@ -166,7 +166,7 @@ export default function App() {
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           {/* LEFT 2 COLUMNS: MUSIC & NEWS FEEDS */}
           <div className="lg:col-span-2 space-y-8">
-            {/* LATEST MUSIC & VIDEOS (10 ITEMS) */}
+            {/* LATEST MUSIC & VIDEOS */}
             <section className="space-y-4">
               <div className="flex items-center justify-between border-b border-gray-800 pb-2">
                 <h3 className="text-lg font-bold text-white border-l-4 border-emerald-500 pl-3">Latest Music & Videos</h3>
@@ -203,7 +203,7 @@ export default function App() {
               </div>
             </section>
 
-            {/* LATEST NEWS & GOSSIP (10 ITEMS) */}
+            {/* LATEST NEWS & GOSSIP */}
             <section className="space-y-4">
               <div className="flex items-center justify-between border-b border-gray-800 pb-2">
                 <h3 className="text-lg font-bold text-white border-l-4 border-emerald-500 pl-3">Latest News & Gossip</h3>
@@ -218,113 +218,6 @@ export default function App() {
                     />
                     <div className="flex-1 min-w-0">
                       <span className="text-[10px] text-gray-400 uppercase">{item.category || "News"}</span>
-                      <h4 className="text-sm font-semibold text-white truncate">{item.title}</h4>
-                      <p className="text-xs text-gray-500 truncate">
-                        {item.created_at ? new Date(item.created_at).toLocaleDateString() : "Recent"}
-                      </p>
-                    </div>
-                    <a
-                      href={`/news/${item.slug || item.id}`}
-                      className="px-3 py-1.5 bg-gray-800 hover:bg-emerald-600 text-white text-xs rounded transition shrink-0"
-                    >
-                      Read
-                    </a>
-                  </div>
-                ))}
-              </div>
-              <div className="text-center pt-2">
-                <a
-                  href="/category/news"
-                  className="inline-block px-6 py-2 bg-[#181818] border border-gray-800 hover:border-emerald-500 text-xs font-semibold rounded-lg text-gray-300 hover:text-white transition"
-                >
-                  View More News
-                </a>
-              </div>
-            </section>
-          </div>
-
-          {/* RIGHT COLUMN: SIDEBAR & BEAT STORE */}
-          <div className="space-y-6">
-            {/* BEAT STORE PREVIEW */}
-            <section className="p-4 bg-[#141414] border border-gray-800 rounded-xl space-y-4">
-              <h3 className="text-base font-bold text-white border-b border-gray-800 pb-2">Beat Store (Licensing)</h3>
-              <div className="space-y-3">
-                {beatsList.map((beat) => (
-                  <div key={beat.id} className="p-3 bg-[#1a1a1a] border border-gray-800 rounded-lg flex items-center justify-between gap-2">
-                    <div className="min-w-0">
-                      <p className="text-xs font-bold text-white truncate">{beat.title}</p>
-                      <p className="text-[10px] text-emerald-400 font-semibold">From ₦{beat.price_mp3 || "15,000"}</p>
-                    </div>
-                    <button
-                      onClick={() => setSelectedBeat(beat)}
-                      className="px-3 py-1 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-semibold rounded transition shrink-0"
-                    >
-                      Buy License
-                    </button>
-                  </div>
-                ))}
-              </div>
-            </section>
-
-            {/* TOP 10 SONGS SIDEBAR */}
-            <section className="p-4 bg-[#141414] border border-gray-800 rounded-xl space-y-3">
-              <h3 className="text-base font-bold text-white border-b border-gray-800 pb-2">Top 10 Songs</h3>
-              <div className="space-y-2">
-                {musicFeed.slice(0, 10).map((track, idx) => (
-                  <div key={track.id || idx} className="flex items-center gap-3 text-xs">
-                    <span className="font-bold text-emerald-400 w-4">{idx + 1}.</span>
-                    <a href={`/music/${track.slug || track.id}`} className="text-gray-200 hover:text-emerald-400 truncate flex-1">
-                      {track.title} - {track.artist}
-                    </a>
-                  </div>
-                ))}
-              </div>
-            </section>
-          </div>
-        </div>
-      </div>
-
-      {/* BEAT LICENSING & PAYSTACK MODAL */}
-      {selectedBeat && (
-        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-[#181818] border border-gray-800 rounded-xl max-w-md w-full p-6 space-y-4">
-            <div className="flex items-center justify-between border-b border-gray-800 pb-2">
-              <h3 className="text-base font-bold text-white">Select License: {selectedBeat.title}</h3>
-              <button onClick={() => setSelectedBeat(null)} className="text-gray-400 hover:text-white">✕</button>
-            </div>
-            <div className="space-y-3 text-xs">
-              <div className="p-3 bg-[#121212] border border-gray-800 rounded flex justify-between items-center">
-                <div>
-                  <p className="font-bold text-white">Basic MP3 Lease</p>
-                  <p className="text-gray-400">Untagged MP3 • Standard Usage</p>
-                </div>
-                <button
-                  onClick={() => handlePaystackCheckout(selectedBeat, "mp3", selectedBeat.price_mp3 || 15000)}
-                  className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded font-bold"
-                >
-                  ₦{selectedBeat.price_mp3 || "15,000"}
-                </button>
-              </div>
-              <div className="p-3 bg-[#121212] border border-gray-800 rounded flex justify-between items-center">
-                <div>
-                  <p className="font-bold text-white">Premium WAV Lease</p>
-                  <p className="text-gray-400">WAV + MP3 • Commercial Usage</p>
-                </div>
-                <button
-                  onClick={() => handlePaystackCheckout(selectedBeat, "wav", selectedBeat.price_wav || 35000)}
-                  className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded font-bold"
-                >
-                  ₦{selectedBeat.price_wav || "35,000"}
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-    </main>
-  );
-}
-ppercase">{item.category || "News"}</span>
                       <h4 className="text-sm font-semibold text-white truncate">{item.title}</h4>
                       <p className="text-xs text-gray-500 truncate">
                         {item.created_at ? new Date(item.created_at).toLocaleDateString() : "Recent"}
