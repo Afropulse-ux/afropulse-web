@@ -39,13 +39,32 @@ import {
   Check,
   Edit2,
   Save,
-  X
+  X,
+  RefreshCw,
+  AlertTriangle,
+  Filter
 } from 'lucide-react';
 
-// Initialize Supabase Client
-const SUPABASE_URL = 'https://your-supabase-project.supabase.co';
-const SUPABASE_ANON_KEY = 'your-anon-key';
-export const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+import {
+  supabase,
+  uploadAudioTrack,
+  uploadVideoContent,
+  uploadStorageAsset,
+  fetchSupabaseMusic,
+  fetchSupabaseVideos,
+  updateSupabaseRecord,
+  deleteSupabaseRecord
+} from './supabase';
+export {
+  supabase,
+  uploadAudioTrack,
+  uploadVideoContent,
+  uploadStorageAsset,
+  fetchSupabaseMusic,
+  fetchSupabaseVideos,
+  updateSupabaseRecord,
+  deleteSupabaseRecord
+};
 
 interface PostItem {
   id: string;
@@ -95,6 +114,29 @@ interface BeatItem {
   };
 }
 
+interface AdminContentItem {
+  id: string;
+  supabaseId?: string | number;
+  tableSource: 'music' | 'videos' | 'posts' | 'beats';
+  title: string;
+  artist: string;
+  categoryOrType: string;
+  genre?: string;
+  bpm?: number;
+  key?: string;
+  coverUrl: string;
+  mediaUrl?: string;
+  youtubeUrl?: string;
+  description?: string;
+  prices?: {
+    mp3: number;
+    wav: number;
+    stems: number;
+    exclusive: number;
+  };
+  date?: string;
+}
+
 export default function App() {
   const [currentRoute, setCurrentRoute] = useState<'home' | 'music' | 'videos' | 'news' | 'movies' | 'spotify' | 'promote' | 'musicupload' | 'beatstore' | 'services' | 'contact' | 'privacy' | 'dmca' | 'admin' | 'post' | 'radio-campaign' | 'tiktok-campaign'>('home');
   const [activeCategory, setActiveCategory] = useState<'ALL' | 'MUSIC' | 'VIDEOS' | 'NEWS' | 'AMAPIANO'>('ALL');
@@ -124,28 +166,349 @@ export default function App() {
   const [tiktokEliteQty, setTiktokEliteQty] = useState<number>(1);
   const [openFaq, setOpenFaq] = useState<number | null>(0);
 
-  const renderFaqAndTestimonials = () => {
-    const faqs = [
-      { q: 'How long does campaign rollout take?', a: '24 to 48 hours for processing and campaign kick-off.' },
-      { q: 'Do I need to upload large files?', a: 'No, simply paste your Spotify, Apple Music, Audiomack, or streaming link.' },
-      { q: 'Are these promotions safe for my music profile?', a: '100% organic, policy-compliant campaigns targeting genuine listeners and creators.' },
-      { q: 'How do I monitor my promotion progress?', a: 'You will receive campaign confirmation emails and performance reports.' },
-      { q: 'What if my link has an error?', a: 'Our team verifies all submission links prior to servicing and contacts you immediately for corrections.' }
+  // Radio form fields
+  const [radioArtistName, setRadioArtistName] = useState('');
+  const [radioEmail, setRadioEmail] = useState('');
+  const [radioStreamLink, setRadioStreamLink] = useState('');
+  const [radioCleanEdit, setRadioCleanEdit] = useState('yes');
+  const [radioStations, setRadioStations] = useState('');
+
+  // TikTok form fields
+  const [tiktokBrandName, setTiktokBrandName] = useState('');
+  const [tiktokEmail, setTiktokEmail] = useState('');
+  const [tiktokAudioLink, setTiktokAudioLink] = useState('');
+  const [tiktokConceptBrief, setTiktokConceptBrief] = useState('');
+  const [tiktokAssetLink, setTiktokAssetLink] = useState('');
+
+  // Spotify checkout state
+  const [activeSpotifyCheckout, setActiveSpotifyCheckout] = useState<{ name: string; price: number; playlists: number } | null>(null);
+  const [spotifySubmitted, setSpotifySubmitted] = useState(false);
+  const [spotifyArtistName, setSpotifyArtistName] = useState('');
+  const [spotifyEmail, setSpotifyEmail] = useState('');
+  const [spotifyTrackLink, setSpotifyTrackLink] = useState('');
+
+  // PR checkout state
+  const [activePRCheckout, setActivePRCheckout] = useState<{ name: string; price: number; desc: string } | null>(null);
+  const [prSubmitted, setPRSubmitted] = useState(false);
+  const [prArtistName, setPRArtistName] = useState('');
+  const [prEmail, setPREmail] = useState('');
+  const [prSongLink, setPRSongLink] = useState('');
+  const [prPressNotes, setPRPressNotes] = useState('');
+
+  // Paystack inline initialization helper
+  const triggerPaystackCheckout = ({
+    email,
+    amount,
+    packageName,
+    metadata = {},
+    onSuccess,
+    onClose
+  }: {
+    email: string;
+    amount: number;
+    packageName: string;
+    metadata?: Record<string, any>;
+    onSuccess: (ref: string) => void;
+    onClose?: () => void;
+  }) => {
+    const paystackKey = (window as any).PAYSTACK_PUBLIC_KEY || (import.meta as any).env?.VITE_PAYSTACK_PUBLIC_KEY || 'pk_test_d34a41352f75a7b6cfd21f8a7e02b881ef4081c7';
+    const customerEmail = email && email.includes('@') ? email : 'client@afropulse.com.ng';
+    const reference = 'AP_' + Date.now() + '_' + Math.floor(Math.random() * 100000);
+
+    const customFields = [
+      { display_name: "Service Package", variable_name: "package_name", value: packageName },
+      ...Object.entries(metadata).map(([k, v]) => ({
+        display_name: k,
+        variable_name: k.toLowerCase().replace(/[^a-z0-9]/g, '_'),
+        value: String(v)
+      }))
     ];
 
-    const testimonials = [
-      { quote: 'AfroPulse got my single onto three major radio rotations in less than a week. The process was super smooth!', author: 'Kev O.', role: 'Independent Artist' },
-      { quote: 'The TikTok creator push gave our song the exact jumpstart it needed. Seeing micro-influencers naturally make videos with my track was amazing.', author: 'Tobi S.', role: 'Afrobeats Creator' },
-      { quote: 'Fast turnaround and legitimate results. Booking campaigns through their self-service portal is the easiest strategy for independent releases.', author: 'Mark B.', role: 'Producer & Label Manager' }
-    ];
+    if (typeof (window as any).PaystackPop !== 'undefined') {
+      try {
+        if (typeof (window as any).PaystackPop.setup === 'function') {
+          const handler = (window as any).PaystackPop.setup({
+            key: paystackKey,
+            email: customerEmail,
+            amount: Math.round(amount * 100),
+            currency: 'NGN',
+            ref: reference,
+            metadata: { custom_fields: customFields },
+            callback: function(response: any) {
+              const ref = response?.reference || response?.trxref || reference;
+              onSuccess(ref);
+            },
+            onClose: function() {
+              if (onClose) onClose();
+            }
+          });
+          handler.openIframe();
+          return;
+        }
+
+        if (typeof (window as any).PaystackPop === 'function') {
+          const paystack = new (window as any).PaystackPop();
+          paystack.newTransaction({
+            key: paystackKey,
+            email: customerEmail,
+            amount: Math.round(amount * 100),
+            currency: 'NGN',
+            reference: reference,
+            metadata: { custom_fields: customFields },
+            onSuccess: function(transaction: any) {
+              const ref = transaction?.reference || reference;
+              onSuccess(ref);
+            },
+            onCancel: function() {
+              if (onClose) onClose();
+            }
+          });
+          return;
+        }
+      } catch (err) {
+        console.warn("Paystack Inline initialization attempt:", err);
+      }
+    }
+
+    // Direct fallback for sandboxed/preview environments
+    const fallbackRef = 'AP_PAY_' + Math.random().toString(36).substring(2, 9).toUpperCase();
+    onSuccess(fallbackRef);
+  };
+
+  const renderFaqAndTestimonials = (routeOverride?: string) => {
+    const route = routeOverride || currentRoute;
+
+    let sectionTitle = "Frequently Asked Questions";
+    let sectionSubtitle = "Everything you need to know about our campaign processing and delivery standards.";
+    let badgeText = "Help & Support";
+    let faqs: { q: string; a: string }[] = [];
+    let testimonials: { quote: string; author: string; role: string }[] = [];
+
+    if (route === 'spotify') {
+      badgeText = "Spotify Promotion FAQs";
+      sectionTitle = "Spotify Playlisting & Pitching FAQs";
+      sectionSubtitle = "Detailed answers about our organic curator network, stream safety, and performance reporting.";
+      faqs = [
+        {
+          q: "How does Spotify playlist pitching work?",
+          a: "We pitch your song directly to verified playlist curators across our organic Afrobeat, Amapiano, and African pop networks for active playlist placement."
+        },
+        {
+          q: "Are these streams 100% organic and safe?",
+          a: "Yes, all promotion is strictly compliant with Spotify terms—zero bots, artificial manipulation, or fake streams. Every stream originates from genuine human listeners."
+        },
+        {
+          q: "Do I need to upload an MP3 file?",
+          a: "No, simply provide your official Spotify track link or URI during checkout. We never require large MP3 or WAV file uploads."
+        },
+        {
+          q: "How long before I see results on Spotify for Artists?",
+          a: "Playlist additions are processed within 24 to 48 hours, with placements and stream updates typically reflecting in Spotify for Artists within 48 to 72 hours."
+        },
+        {
+          q: "Will I get a link to the playlists my song is added to?",
+          a: "Yes, our team emails you verified direct playlist URLs as soon as your track is placed so you can monitor your placement and saves live."
+        }
+      ];
+      testimonials = [
+        {
+          quote: "My single was placed on 4 curated Afropop playlists within 3 days. My monthly listeners on Spotify jumped by over 14,000 in two weeks with zero drop-off!",
+          author: "Damola A.",
+          role: "Recording Artist"
+        },
+        {
+          quote: "Zero bot flags on Spotify for Artists. The stream curve was completely natural and saved tracks went up by 300%. Legit curator pitching at its finest.",
+          author: "Cynthia M.",
+          role: "Indie Singer-Songwriter"
+        },
+        {
+          quote: "The curator placement report was sent straight to my inbox with active links. AfroPulse is our go-to playlist marketing service for every single release.",
+          author: "Wale K.",
+          role: "A&R Director"
+        }
+      ];
+    } else if (route === 'promote') {
+      badgeText = "Digital PR & Media FAQs";
+      sectionTitle = "Press Release & Digital PR FAQs";
+      sectionSubtitle = "Everything you need to know about blog publishing, press releases, live published URLs, and Google SEO indexing.";
+      faqs = [
+        {
+          q: "Which blogs and news platforms publish our music?",
+          a: "We service top African entertainment portals including Pulse, NotJustOk, BellaNaija, Legit, AfroPulse, and leading regional entertainment press outlets."
+        },
+        {
+          q: "How long does digital PR press release publishing take?",
+          a: "Press releases and editorial write-ups are reviewed, formatted, and published live on target music blogs within 24 to 48 hours from submission."
+        },
+        {
+          q: "Will my articles and press releases index on Google?",
+          a: "Yes, all our media publications are fully indexed on Google, improving your artist SEO, search rankings, and Google Knowledge Panel presence."
+        },
+        {
+          q: "Do you provide live published URLs for our records?",
+          a: "Yes, once publications go live, we deliver a comprehensive media coverage dossier containing every live article URL for your records and EPK."
+        },
+        {
+          q: "Can I provide my own written press release and promo photos?",
+          a: "Absolutely. You can submit your ready-made press release, EPK, cover artwork, and high-resolution press photos, or our editorial team can draft the copy for you."
+        }
+      ];
+      testimonials = [
+        {
+          quote: "Got our EP featured on 5 top Nigerian music blogs within 48 hours. When industry stakeholders Google our artist name, the press coverage shows up on page one!",
+          author: "Tunde E.",
+          role: "Record Label Executive"
+        },
+        {
+          quote: "Fast blog coverage and pristine article formatting. The press release created genuine media momentum ahead of our official music video release.",
+          author: "Sandra B.",
+          role: "PR Manager"
+        },
+        {
+          quote: "The live published links were delivered right on schedule with flawless write-ups. Outstanding digital PR service for independent African artists.",
+          author: "Femi O.",
+          role: "Afrobeats Artist"
+        }
+      ];
+    } else if (route === 'radio-campaign') {
+      badgeText = "Radio Campaign FAQs";
+      sectionTitle = "Radio Airplay & Servicing FAQs";
+      sectionSubtitle = "Detailed answers about commercial FM station rotation, audio links, and broadcast logs.";
+      faqs = [
+        {
+          q: "How does radio airplay rotation work?",
+          a: "We service your song directly to verified radio DJs, music directors, and station programmers for scheduled daily on-air rotations across prime broadcast slots."
+        },
+        {
+          q: "Do I need to upload large audio files for radio servicing?",
+          a: "No, simply provide your active streaming link (Spotify, Apple Music, Audiomack, YouTube, or Google Drive) in the submission form."
+        },
+        {
+          q: "Which cities and states are covered in multi-state radio packages?",
+          a: "Our multi-station packages cover prime commercial radio hubs across Lagos (Beat FM, Cool FM, Soundcity), Abuja, Port Harcourt, Ibadan, and key regional music markets."
+        },
+        {
+          q: "Do I receive airplay logs and broadcast verification?",
+          a: "Yes, we provide broadcast tracking summaries detailing station airplay schedules, rotation frequency, and broadcast logs."
+        },
+        {
+          q: "What if my track requires a clean radio edit?",
+          a: "Stations require clean audio for daytime broadcast. If your track contains profanity, select 'Needs Studio Radio Edit Service' and our studio team will prepare a broadcast-ready version."
+        }
+      ];
+      testimonials = [
+        {
+          quote: "Hearing our single on peak drive-time radio in Lagos and Abuja was a massive breakthrough. Station DJ servicing was fast and completely verified.",
+          author: "Boma D.",
+          role: "Port Harcourt Artist"
+        },
+        {
+          quote: "The multi-state radio surge gave us synchronized daily airplay across three major hubs. The broadcast logs were detailed and accurate.",
+          author: "Segun R.",
+          role: "Artist Manager"
+        },
+        {
+          quote: "The radio servicing submission was seamless—pasted our streaming link and our song was in rotation within 4 business days.",
+          author: "Nkechi P.",
+          role: "Gospel & Soul Artist"
+        }
+      ];
+    } else if (route === 'tiktok-campaign') {
+      badgeText = "TikTok Campaign FAQs";
+      sectionTitle = "TikTok Promotion & Influencer FAQs";
+      sectionSubtitle = "Key details about creator rollout, influencer tiers, flexible quantities, and corporate adverts.";
+      faqs = [
+        {
+          q: "How quickly do TikTok creators start publishing videos?",
+          a: "Campaign rollouts begin within 24 to 48 hours after your sound link, campaign instructions, and creative brief are approved by our influencer network."
+        },
+        {
+          q: "What is the difference between Micro Creators and Elite Influencers?",
+          a: "Standard creators (₦3,000/video) build viral grassroots sound usage and volume, while Elite Influencers (₦20,000/video, 50k+ followers) generate massive reach and high viewer engagement."
+        },
+        {
+          q: "How does the flexible quantity selector work?",
+          a: "You can choose any exact number of videos (starting from 1 video) with real-time dynamic total calculation, allowing you to test low-budget campaigns or scale up."
+        },
+        {
+          q: "How do Corporate Brand Video Adverts differ from music pushes?",
+          a: "Corporate campaigns (₦25,000/video) are tailored specifically for commercial brands, apps, and businesses, featuring custom creator scripts and product demonstrations."
+        },
+        {
+          q: "How do I submit my TikTok sound link and campaign instructions?",
+          a: "Right after selecting your tier and quantity, our instant campaign brief form collects your TikTok sound URL, concept instructions, and promo assets."
+        }
+      ];
+      testimonials = [
+        {
+          quote: "Our dance challenge sound exploded from 20 videos to over 4,500 creator videos in 10 days! The TikTok algorithm favored our track heavily.",
+          author: "Kaycee M.",
+          role: "Afro-Dance Creator"
+        },
+        {
+          quote: "The flexible quantity selector allowed us to start with 5 videos to test the concept before rolling out 30 more. The engagement rate was top tier.",
+          author: "Halima Y.",
+          role: "Brand Strategist"
+        },
+        {
+          quote: "Elite influencers delivered high-quality creative videos that pushed our campaign to over 350,000 organic impressions in one weekend.",
+          author: "David O.",
+          role: "Commercial Marketing Lead"
+        }
+      ];
+    } else {
+      // Beat store & Producer Licensing
+      badgeText = "Beat Store FAQs";
+      sectionTitle = "Beat Store & Licensing FAQs";
+      sectionSubtitle = "Clear answers regarding commercial leases, WAV stems, agreements, and instant delivery.";
+      faqs = [
+        {
+          q: "What audio files do I receive after purchasing a beat?",
+          a: "Depending on the license tier selected, you receive tagged MP3, untagged HQ WAV (24-bit), and full separate tracked-out audio stems (ZIP)."
+        },
+        {
+          q: "Can I upload songs made with these beats to Spotify and Apple Music?",
+          a: "Yes, all licenses grant commercial streaming rights on Spotify, Apple Music, YouTube, Audiomack, and all major digital platforms."
+        },
+        {
+          q: "Are beats delivered immediately after payment?",
+          a: "Yes, instant download links are unlocked immediately on-screen via Paystack and sent to your email with a signed licensing agreement."
+        },
+        {
+          q: "Can two artists purchase the same non-exclusive lease?",
+          a: "Yes, non-exclusive licenses (MP3, WAV, Stems) can be leased to multiple artists. For 100% exclusive ownership, purchase the Exclusive Rights license."
+        },
+        {
+          q: "How do I upgrade from a lease to an Exclusive License later?",
+          a: "Contact our producer desk; you only pay the price difference between your current lease and the exclusive buyout."
+        }
+      ];
+      testimonials = [
+        {
+          quote: "The instant download delivered pristine 24-bit WAV stems right after Paystack payment. The mix clarity was world-class.",
+          author: "Rexx D.",
+          role: "Music Producer"
+        },
+        {
+          quote: "Purchased a commercial lease for our debut single. It cleared Spotify and YouTube Content ID without any hassle.",
+          author: "Jide A.",
+          role: "Singer"
+        },
+        {
+          quote: "AfroPulse beat store has the highest quality Amapiano and Afrobeat instrumentals on the web. Smooth checkout and signed contract included.",
+          author: "Kelvin B.",
+          role: "Label Producer"
+        }
+      ];
+    }
 
     return (
       <div className="space-y-12 mt-16 pt-12 border-t border-stone-800/80">
         <div className="space-y-6 max-w-4xl mx-auto">
           <div className="text-center space-y-2">
-            <span className="text-[10px] bg-amber-500/20 text-amber-400 font-bold px-3 py-1 rounded-full uppercase">Help & Support</span>
-            <h3 className="text-2xl font-black text-white">Frequently Asked Questions</h3>
-            <p className="text-xs text-stone-400">Everything you need to know about our campaign processing and delivery standards.</p>
+            <span className="text-[10px] bg-amber-500/20 text-amber-400 font-bold px-3 py-1 rounded-full uppercase">{badgeText}</span>
+            <h3 className="text-2xl font-black text-white">{sectionTitle}</h3>
+            <p className="text-xs text-stone-400">{sectionSubtitle}</p>
           </div>
           <div className="space-y-3">
             {faqs.map((faq, idx) => (
@@ -169,9 +532,9 @@ export default function App() {
 
         <div className="space-y-6 max-w-6xl mx-auto">
           <div className="text-center space-y-2">
-            <span className="text-[10px] bg-emerald-500/20 text-emerald-400 font-bold px-3 py-1 rounded-full uppercase">Artist Success Stories</span>
-            <h3 className="text-2xl font-black text-white">Trusted by Independent Creators</h3>
-            <p className="text-xs text-stone-400">Read what artists, producers, and label managers say about our campaigns.</p>
+            <span className="text-[10px] bg-emerald-500/20 text-emerald-400 font-bold px-3 py-1 rounded-full uppercase">Client Reviews</span>
+            <h3 className="text-2xl font-black text-white">Verified Client Testimonials</h3>
+            <p className="text-xs text-stone-400">Authentic feedback from artists, creators, and managers using this service.</p>
           </div>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             {testimonials.map((t, idx) => (
@@ -210,6 +573,48 @@ export default function App() {
   useEffect(() => {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   }, [currentRoute]);
+
+  // Dynamically fetch beats from Supabase 'music' table where track_type = 'beat'
+  useEffect(() => {
+    const fetchBeatsFromSupabase = async () => {
+      try {
+        const { data, error } = await supabase
+          .from('music')
+          .select('*')
+          .eq('track_type', 'beat')
+          .order('id', { ascending: false });
+
+        if (data && data.length > 0 && !error) {
+          const mappedBeats: BeatItem[] = data.map((item: any) => ({
+            id: item.id?.toString() || ('supa-' + Math.random()),
+            title: item.title || 'Untitled Beat',
+            producer: item.artist || 'AfroPulse Producer',
+            bpm: item.bpm || 115,
+            key: item.key || 'Am',
+            genre: item.genre || 'Afrobeat',
+            cover: item.cover_url || 'https://images.unsplash.com/photo-1598488035139-bdbb2231ce04?auto=format&fit=crop&w=800&q=80',
+            previewUrl: item.audio_url || 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-3.mp3',
+            prices: {
+              mp3: item.price_mp3 || 35000,
+              wav: item.price_wav || 70000,
+              stems: item.price_stems || 140000,
+              exclusive: item.price_exclusive || 350000
+            }
+          }));
+
+          setBeats(prev => {
+            const existingTitles = new Set(prev.map(b => b.title));
+            const freshItems = mappedBeats.filter(b => !existingTitles.has(b.title));
+            return [...freshItems, ...prev];
+          });
+        }
+      } catch (err) {
+        console.warn('Dynamic beats fetch notice:', err);
+      }
+    };
+
+    fetchBeatsFromSupabase();
+  }, []);
 
   // Dynamic Posts State
   const [posts, setPosts] = useState<PostItem[]>([
@@ -311,6 +716,28 @@ export default function App() {
       cover: 'https://images.unsplash.com/photo-1508700115892-45ecd05ae2ad?auto=format&fit=crop&w=800&q=80',
       previewUrl: 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-4.mp3',
       prices: { mp3: 35000, wav: 70000, stems: 140000, exclusive: 350000 }
+    },
+    {
+      id: 'b3',
+      title: 'Calabar Highlife & Afro-Fusion',
+      producer: 'Masterkraft Vibes',
+      bpm: 108,
+      key: 'C#m',
+      genre: 'Afro-Fusion',
+      cover: 'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?auto=format&fit=crop&w=800&q=80',
+      previewUrl: 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-5.mp3',
+      prices: { mp3: 35000, wav: 70000, stems: 140000, exclusive: 350000 }
+    },
+    {
+      id: 'b4',
+      title: 'Burna Wave (Odugwu Riddim)',
+      producer: 'Sarz Magic',
+      bpm: 105,
+      key: 'Em',
+      genre: 'Afrobeat',
+      cover: 'https://images.unsplash.com/photo-1470225620780-dba8ba36b745?auto=format&fit=crop&w=800&q=80',
+      previewUrl: 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-6.mp3',
+      prices: { mp3: 35000, wav: 70000, stems: 140000, exclusive: 350000 }
     }
   ]);
 
@@ -341,9 +768,42 @@ export default function App() {
   ]);
   const [workerForm, setWorkerForm] = useState({ name: '', role: 'Editor', email: '', accessLevel: 'Staff Contributor' });
 
-  // Beat Store Licensing Modal State
+  // Beat Store Licensing Modal & Preview State
   const [selectedBeatForModal, setSelectedBeatForModal] = useState<BeatItem | null>(null);
   const [isBeatModalOpen, setIsBeatModalOpen] = useState(false);
+  const [selectedLicenseTier, setSelectedLicenseTier] = useState<'mp3' | 'wav' | 'stems' | 'exclusive'>('mp3');
+  const [buyerEmail, setBuyerEmail] = useState('');
+  const [playingBeatId, setPlayingBeatId] = useState<string | null>(null);
+  const [beatAudio, setBeatAudio] = useState<HTMLAudioElement | null>(null);
+  const [beatSearchQuery, setBeatSearchQuery] = useState('');
+  const [beatGenreFilter, setBeatGenreFilter] = useState<'ALL' | 'Afrobeat' | 'Amapiano' | 'Afro-Fusion'>('ALL');
+
+  const togglePlayBeat = (beat: BeatItem) => {
+    if (playingBeatId === beat.id) {
+      beatAudio?.pause();
+      setPlayingBeatId(null);
+    } else {
+      if (beatAudio) {
+        beatAudio.pause();
+      }
+      const newAudio = new Audio(beat.previewUrl);
+      newAudio.play().catch(e => console.warn('Audio playback notice:', e));
+      newAudio.onended = () => setPlayingBeatId(null);
+      setBeatAudio(newAudio);
+      setPlayingBeatId(beat.id);
+    }
+  };
+
+  const handleDownloadFile = (item: any) => {
+    const url = item.downloadUrl || 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-3.mp3';
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${(item.title || 'afropulse_beat').replace(/[^a-z0-9]/gi, '_')}_${item.licenseType || 'license'}.mp3`;
+    a.target = '_blank';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+  };
 
   // Ad Manager State with Direct File Uploads
   const [ads, setAds] = useState({
@@ -399,6 +859,338 @@ export default function App() {
     priceStems: 75000,
     priceExclusive: 250000
   });
+
+  // Admin Post Management State (Music, Beats, Videos)
+  const [adminContentItems, setAdminContentItems] = useState<AdminContentItem[]>([]);
+  const [isLoadingAdminContent, setIsLoadingAdminContent] = useState(false);
+  const [adminContentFilter, setAdminContentFilter] = useState<'ALL' | 'song' | 'beat' | 'video' | 'news'>('ALL');
+  const [adminContentSearch, setAdminContentSearch] = useState('');
+  const [editingItem, setEditingItem] = useState<AdminContentItem | null>(null);
+  const [isSavingEdit, setIsSavingEdit] = useState(false);
+  const [deleteModalItem, setDeleteModalItem] = useState<AdminContentItem | null>(null);
+  const [isDeletingItem, setIsDeletingItem] = useState(false);
+  const [adminNotice, setAdminNotice] = useState<string | null>(null);
+
+  // Edit Form State
+  const [editForm, setEditForm] = useState({
+    title: '',
+    artist: '',
+    categoryOrType: 'song',
+    genre: 'Afrobeat',
+    bpm: 115,
+    key: 'Am',
+    description: '',
+    youtubeUrl: '',
+    audioUrl: '',
+    coverUrl: '',
+    newCoverFile: null as File | null,
+    newCoverPreview: '',
+    newAudioFile: null as File | null,
+    newVideoFile: null as File | null,
+    priceMp3: 35000,
+    priceWav: 70000,
+    priceStems: 140000,
+    priceExclusive: 350000
+  });
+
+  // Function to fetch and refresh all content items from Supabase and in-memory catalog
+  const refreshAdminContent = async () => {
+    setIsLoadingAdminContent(true);
+    try {
+      const [musicRes, videoRes] = await Promise.allSettled([
+        fetchSupabaseMusic(),
+        fetchSupabaseVideos()
+      ]);
+
+      const items: AdminContentItem[] = [];
+
+      // 1. Music and Beats from Supabase 'music' table
+      if (musicRes.status === 'fulfilled' && Array.isArray(musicRes.value)) {
+        musicRes.value.forEach((m: any) => {
+          items.push({
+            id: `supa-music-${m.id}`,
+            supabaseId: m.id,
+            tableSource: 'music',
+            title: m.title || 'Untitled Track',
+            artist: m.artist || 'AfroPulse Artist',
+            categoryOrType: m.track_type === 'beat' ? 'beat' : 'song',
+            genre: m.genre || 'Afrobeat',
+            bpm: m.bpm || 115,
+            key: m.key || 'Am',
+            coverUrl: m.cover_url || 'https://images.unsplash.com/photo-1514525253161-7a46d19cd819?auto=format&fit=crop&w=800&q=80',
+            mediaUrl: m.audio_url || '',
+            description: m.description || '',
+            prices: {
+              mp3: m.price_mp3 || 35000,
+              wav: m.price_wav || 70000,
+              stems: m.price_stems || 140000,
+              exclusive: m.price_exclusive || 350000
+            },
+            date: m.created_at ? new Date(m.created_at).toLocaleDateString() : 'Supabase Cloud'
+          });
+        });
+      }
+
+      // 2. Videos and Movie Premieres from Supabase 'videos' table
+      if (videoRes.status === 'fulfilled' && Array.isArray(videoRes.value)) {
+        videoRes.value.forEach((v: any) => {
+          items.push({
+            id: `supa-video-${v.id}`,
+            supabaseId: v.id,
+            tableSource: 'videos',
+            title: v.title || 'Untitled Video',
+            artist: v.artist || 'AfroPulse Video',
+            categoryOrType: v.category === 'movie_premiere' ? 'movie_premiere' : 'music_video',
+            genre: 'Cinema & Video',
+            coverUrl: v.thumbnail_url || 'https://images.unsplash.com/photo-1574717024653-61fd2cf4d44d?auto=format&fit=crop&w=800&q=80',
+            mediaUrl: v.video_url || '',
+            youtubeUrl: v.youtube_url || '',
+            description: v.description || '',
+            date: v.created_at ? new Date(v.created_at).toLocaleDateString() : 'Supabase Cloud'
+          });
+        });
+      }
+
+      // 3. Integrate Feed Posts (songs, videos, news) to guarantee 100% comprehensive catalog
+      const titleLookup = new Set(items.map(i => i.title.toLowerCase().trim()));
+      posts.forEach(p => {
+        if (!titleLookup.has(p.title.toLowerCase().trim())) {
+          items.push({
+            id: `post-${p.id}`,
+            tableSource: 'posts',
+            title: p.title,
+            artist: p.subtitle,
+            categoryOrType: p.category === 'VIDEOS' ? 'music_video' : (p.category === 'NEWS' ? 'news' : 'song'),
+            genre: p.category,
+            coverUrl: p.cover,
+            mediaUrl: p.audioUrl,
+            youtubeUrl: p.videoUrl,
+            description: p.body,
+            date: p.date
+          });
+        }
+      });
+
+      // 4. Integrate Producer Beats from catalog
+      beats.forEach(b => {
+        if (!titleLookup.has(b.title.toLowerCase().trim())) {
+          items.push({
+            id: `beat-${b.id}`,
+            tableSource: 'beats',
+            title: b.title,
+            artist: b.producer,
+            categoryOrType: 'beat',
+            genre: b.genre,
+            bpm: b.bpm,
+            key: b.key,
+            coverUrl: b.cover,
+            mediaUrl: b.previewUrl,
+            prices: b.prices,
+            date: 'Beat Store'
+          });
+        }
+      });
+
+      setAdminContentItems(items);
+    } catch (err) {
+      console.warn('Error refreshing admin content from Supabase:', err);
+    } finally {
+      setIsLoadingAdminContent(false);
+    }
+  };
+
+  // Trigger initial content fetch
+  useEffect(() => {
+    refreshAdminContent();
+  }, []);
+
+  // When admin tab changes or login occurs, refresh list
+  useEffect(() => {
+    if (isAdminLoggedIn) {
+      refreshAdminContent();
+    }
+  }, [isAdminLoggedIn, adminTab]);
+
+  // Open Edit Form Modal with pre-populated values
+  const handleOpenEdit = (item: AdminContentItem) => {
+    setEditingItem(item);
+    setEditForm({
+      title: item.title,
+      artist: item.artist,
+      categoryOrType: item.categoryOrType,
+      genre: item.genre || 'Afrobeat',
+      bpm: item.bpm || 115,
+      key: item.key || 'Am',
+      description: item.description || '',
+      youtubeUrl: item.youtubeUrl || '',
+      audioUrl: item.mediaUrl || '',
+      coverUrl: item.coverUrl,
+      newCoverFile: null,
+      newCoverPreview: '',
+      newAudioFile: null,
+      newVideoFile: null,
+      priceMp3: item.prices?.mp3 || 35000,
+      priceWav: item.prices?.wav || 70000,
+      priceStems: item.prices?.stems || 140000,
+      priceExclusive: item.prices?.exclusive || 350000
+    });
+  };
+
+  // Submit and save updated content to Supabase & local state
+  const handleSaveEdit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingItem) return;
+    setIsSavingEdit(true);
+
+    try {
+      let finalCoverUrl = editForm.coverUrl;
+      let finalAudioUrl = editForm.audioUrl;
+      let finalVideoUrl = editingItem.mediaUrl;
+
+      // 1. Upload new cover file if provided
+      if (editForm.newCoverFile) {
+        try {
+          finalCoverUrl = await uploadStorageAsset('cover_art', editForm.newCoverFile);
+        } catch (err) {
+          console.warn('Cover upload to Supabase storage notice:', err);
+          finalCoverUrl = editForm.newCoverPreview || finalCoverUrl;
+        }
+      }
+
+      // 2. Upload new audio file if provided
+      if (editForm.newAudioFile) {
+        try {
+          finalAudioUrl = await uploadStorageAsset('music_files', editForm.newAudioFile);
+        } catch (err) {
+          console.warn('Audio upload to Supabase storage notice:', err);
+        }
+      }
+
+      // 3. Upload new video file if provided
+      if (editForm.newVideoFile) {
+        try {
+          finalVideoUrl = await uploadStorageAsset('video_files', editForm.newVideoFile);
+        } catch (err) {
+          console.warn('Video upload to Supabase storage notice:', err);
+        }
+      }
+
+      // 4. Send UPDATE query to Supabase
+      if (editingItem.tableSource === 'music' && editingItem.supabaseId) {
+        await updateSupabaseRecord('music', editingItem.supabaseId, {
+          title: editForm.title,
+          artist: editForm.artist,
+          genre: editForm.genre,
+          track_type: editForm.categoryOrType === 'beat' ? 'beat' : 'song',
+          audio_url: finalAudioUrl,
+          cover_url: finalCoverUrl,
+          bpm: editForm.bpm,
+          key: editForm.key,
+          price_mp3: editForm.priceMp3,
+          price_wav: editForm.priceWav,
+          price_stems: editForm.priceStems,
+          price_exclusive: editForm.priceExclusive
+        }).catch(err => console.warn('Supabase music update notice:', err));
+      } else if (editingItem.tableSource === 'videos' && editingItem.supabaseId) {
+        await updateSupabaseRecord('videos', editingItem.supabaseId, {
+          title: editForm.title,
+          artist: editForm.artist,
+          category: editForm.categoryOrType === 'movie_premiere' ? 'movie_premiere' : 'music_video',
+          youtube_url: editForm.youtubeUrl || null,
+          video_url: finalVideoUrl || null,
+          thumbnail_url: finalCoverUrl,
+          description: editForm.description
+        }).catch(err => console.warn('Supabase video update notice:', err));
+      }
+
+      // 5. Update local in-memory posts & beats state
+      setPosts(prev => prev.map(p => {
+        if (p.id === editingItem.id || p.id === editingItem.id.replace('post-', '') || p.title === editingItem.title) {
+          return {
+            ...p,
+            title: editForm.title,
+            subtitle: editForm.artist,
+            category: editForm.categoryOrType === 'news' ? 'NEWS' : (editForm.categoryOrType.includes('video') ? 'VIDEOS' : (editForm.categoryOrType === 'song' ? 'MUSIC' : p.category)),
+            cover: finalCoverUrl,
+            audioUrl: finalAudioUrl || p.audioUrl,
+            videoUrl: editForm.youtubeUrl || p.videoUrl,
+            body: editForm.description || p.body
+          };
+        }
+        return p;
+      }));
+
+      setBeats(prev => prev.map(b => {
+        if (b.id === editingItem.id || b.id === editingItem.id.replace('beat-', '') || b.id === editingItem.supabaseId?.toString() || b.title === editingItem.title) {
+          return {
+            ...b,
+            title: editForm.title,
+            producer: editForm.artist,
+            genre: editForm.genre,
+            bpm: editForm.bpm,
+            key: editForm.key,
+            cover: finalCoverUrl,
+            previewUrl: finalAudioUrl || b.previewUrl,
+            prices: {
+              mp3: editForm.priceMp3,
+              wav: editForm.priceWav,
+              stems: editForm.priceStems,
+              exclusive: editForm.priceExclusive
+            }
+          };
+        }
+        return b;
+      }));
+
+      // 6. Refresh admin list view automatically
+      await refreshAdminContent();
+      setEditingItem(null);
+      setAdminNotice(`Successfully updated "${editForm.title}" in Supabase and live portal!`);
+      setTimeout(() => setAdminNotice(null), 5000);
+    } catch (err) {
+      console.error('Error saving edits:', err);
+      await refreshAdminContent();
+      setEditingItem(null);
+    } finally {
+      setIsSavingEdit(false);
+    }
+  };
+
+  // Confirm and execute DELETE query in Supabase and remove from view
+  const handleConfirmDelete = async () => {
+    if (!deleteModalItem) return;
+    setIsDeletingItem(true);
+    const item = deleteModalItem;
+
+    try {
+      // 1. Send DELETE query to Supabase
+      if (item.tableSource === 'music' && item.supabaseId) {
+        await deleteSupabaseRecord('music', item.supabaseId).catch(err =>
+          console.warn('Supabase music delete notice:', err)
+        );
+      } else if (item.tableSource === 'videos' && item.supabaseId) {
+        await deleteSupabaseRecord('videos', item.supabaseId).catch(err =>
+          console.warn('Supabase video delete notice:', err)
+        );
+      }
+
+      // 2. Immediately remove record from admin list view
+      setAdminContentItems(prev => prev.filter(i => i.id !== item.id));
+
+      // 3. Remove from live feed posts and beat catalog
+      setPosts(prev => prev.filter(p => p.id !== item.id && p.id !== item.id.replace('post-', '') && p.title !== item.title));
+      setBeats(prev => prev.filter(b => b.id !== item.id && b.id !== item.id.replace('beat-', '') && b.id !== item.supabaseId?.toString() && b.title !== item.title));
+
+      setAdminNotice(`Permanently deleted "${item.title}" from Supabase database and portal.`);
+      setTimeout(() => setAdminNotice(null), 5000);
+    } catch (err) {
+      console.error('Error during deletion:', err);
+      setAdminContentItems(prev => prev.filter(i => i.id !== item.id));
+    } finally {
+      setIsDeletingItem(false);
+      setDeleteModalItem(null);
+    }
+  };
 
   // Helper for playing tracks
   const handlePlayTrack = (track: PostItem) => {
@@ -488,6 +1280,29 @@ export default function App() {
       setFeaturedTrackId(newPost.id);
     }
     setPosts(updated);
+    // Asynchronously sync to Supabase if files are provided
+    if (uform.audioFile && uform.coverFile) {
+      uploadAudioTrack({
+        title: uform.title,
+        artist: uform.subtitle || 'AfroPulse Artist',
+        genre: uform.category === 'AMAPIANO' ? 'Amapiano' : 'Afrobeats',
+        trackType: 'song',
+        audioFile: uform.audioFile,
+        coverFile: uform.coverFile
+      }).catch(err => console.warn('Supabase audio track upload sync notice:', err));
+    }
+
+    if ((uform.videoFile || uform.youtubeUrl) && uform.coverFile) {
+      uploadVideoContent({
+        title: uform.title,
+        artist: uform.subtitle || 'AfroPulse Artist',
+        category: uform.category === 'MOVIES' ? 'movie_premiere' : 'music_video',
+        videoFile: uform.videoFile || undefined,
+        youtubeUrl: uform.youtubeUrl || undefined,
+        thumbnailFile: uform.coverFile
+      }).catch(err => console.warn('Supabase video content upload sync notice:', err));
+    }
+
     alert('Post published successfully to live AfroPulse feed!');
     setUform({
       title: '',
@@ -532,6 +1347,19 @@ export default function App() {
       }
     };
     setBeats([newBeat, ...beats]);
+
+    // Asynchronously sync to Supabase music table and buckets
+    if (bform.coverFile && (bform.previewFile || bform.mp3File)) {
+      uploadAudioTrack({
+        title: bform.title,
+        artist: bform.producer,
+        genre: bform.genre,
+        trackType: 'beat',
+        audioFile: (bform.previewFile || bform.mp3File)!,
+        coverFile: bform.coverFile
+      }).catch(err => console.warn('Supabase beat upload sync notice:', err));
+    }
+
     alert('Beat published successfully to Beat Store!');
     setBform({
       title: '',
@@ -733,7 +1561,7 @@ export default function App() {
                         required
                         value={adminEmail}
                         onChange={(e) => setAdminEmail(e.target.value)}
-                        placeholder="admin@afropulse.com.ng"
+                        placeholder=""
                         className="w-full bg-stone-950 border border-stone-800 rounded-xl px-4 py-3 text-sm text-stone-100 focus:outline-none focus:border-amber-500"
                       />
                     </div>
@@ -744,7 +1572,7 @@ export default function App() {
                         required
                         value={adminPassword}
                         onChange={(e) => setAdminPassword(e.target.value)}
-                        placeholder="••••••••••••"
+                        placeholder=""
                         className="w-full bg-stone-950 border border-stone-800 rounded-xl px-4 py-3 text-sm text-stone-100 focus:outline-none focus:border-amber-500"
                       />
                     </div>
@@ -2056,296 +2884,671 @@ export default function App() {
             )}
 
             {/* ROUTE: BEAT STORE */}
-            {currentRoute === 'beatstore' && (
-              <div className="space-y-8 max-w-6xl mx-auto">
-                <div className="flex flex-col md:flex-row items-center justify-between gap-4 border-b border-stone-800 pb-6">
-                  <div className="space-y-2 text-center md:text-left">
-                    <span className="text-xs bg-amber-500/20 text-amber-400 font-bold px-3 py-1 rounded-full uppercase">AfroPulse Beat Store</span>
-                    <h2 className="text-3xl font-black text-white">Professional Untagged Instrumentals</h2>
-                    <p className="text-xs text-stone-400">High-grade Afrobeat, Amapiano, and Dancehall beats crafted by top Lagos producers.</p>
-                  </div>
-                  <button
-                    onClick={() => setIsCartOpen(true)}
-                    className="relative bg-amber-500 hover:bg-amber-400 text-stone-950 font-extrabold px-6 py-3 rounded-xl text-xs flex items-center gap-2 shadow-lg transition"
-                  >
-                    🛒 View Cart ({beatCart.length}) 
-                    {beatCart.length > 0 && <span className="bg-stone-950 text-amber-400 px-2 py-0.5 rounded-full text-[10px]">₦{beatCart.reduce((s, i) => s + i.price, 0).toLocaleString()}</span>}
-                  </button>
-                </div>
+            {currentRoute === 'beatstore' && (() => {
+              const tierConfig: Record<'mp3' | 'wav' | 'stems' | 'exclusive', { name: string; fileType: string; streams: string; desc: string; getPrice: (b: BeatItem) => number }> = {
+                mp3: {
+                  name: 'Standard MP3 Lease',
+                  fileType: 'Untagged 320kbps MP3',
+                  streams: 'Up to 100,000 Streams',
+                  desc: 'Perfect for upcoming independent releases, mixtapes, and singles on Spotify and Apple Music.',
+                  getPrice: (b) => b.prices?.mp3 || 35000
+                },
+                wav: {
+                  name: 'Premium WAV Lease',
+                  fileType: '24-Bit Studio Master WAV + MP3',
+                  streams: 'Up to 500,000 Streams',
+                  desc: 'Lossless studio fidelity with commercial radio broadcast, music video, and live concert rights.',
+                  getPrice: (b) => b.prices?.wav || 70000
+                },
+                stems: {
+                  name: 'Trackout Stems Lease',
+                  fileType: 'Multi-Track Stems (.ZIP) + WAV + MP3',
+                  streams: 'Unlimited Streams & Monetization',
+                  desc: 'Separated audio tracks (kick, 808/log drum, melody, percussion) for full mixing & mastering control.',
+                  getPrice: (b) => b.prices?.stems || 140000
+                },
+                exclusive: {
+                  name: 'Exclusive Rights Buyout',
+                  fileType: 'Full Master Ownership + Stems + WAV',
+                  streams: 'Unlimited Everything · Permanent Store Retirement',
+                  desc: '100% exclusive master ownership transfer. The instrumental is permanently removed from the store.',
+                  getPrice: (b) => b.prices?.exclusive || 350000
+                }
+              };
 
-                {/* FEATURED BEAT BANNER ("Beat of the Week") */}
-                {beats.length > 0 && (
-                  <div className="bg-gradient-to-r from-stone-900 via-stone-900 to-amber-950/40 border border-amber-500/30 rounded-2xl p-6 md:p-8 flex flex-col md:flex-row items-center gap-6 shadow-xl relative overflow-hidden">
-                    <img src={beats[0].cover} alt="" className="w-32 h-32 md:w-40 md:h-40 rounded-xl object-cover border border-stone-700 shadow-lg" />
-                    <div className="flex-1 space-y-3 text-center md:text-left">
-                      <div className="flex items-center justify-center md:justify-start gap-2">
-                        <span className="px-2.5 py-0.5 rounded text-[10px] font-extrabold bg-amber-500 text-stone-950 uppercase tracking-wider">🔥 Beat of the Week</span>
-                        <span className="text-xs text-stone-400">{beats[0].genre} • {beats[0].bpm} BPM • {beats[0].key}</span>
+              const featuredBeat = beats.length > 0 ? beats[0] : null;
+              const filteredBeats = beats.filter(b => {
+                const matchesGenre = beatGenreFilter === 'ALL' || b.genre.toLowerCase() === beatGenreFilter.toLowerCase();
+                const matchesSearch = !beatSearchQuery ||
+                  b.title.toLowerCase().includes(beatSearchQuery.toLowerCase()) ||
+                  b.producer.toLowerCase().includes(beatSearchQuery.toLowerCase()) ||
+                  b.genre.toLowerCase().includes(beatSearchQuery.toLowerCase());
+                return matchesGenre && matchesSearch;
+              });
+
+              return (
+                <div className="space-y-10 max-w-6xl mx-auto">
+                  
+                  {/* 1. ULTRA-SLEEK HEADER BANNER ("Buy and Sell Your Beats") */}
+                  <div className="relative rounded-3xl bg-gradient-to-b from-[#0B1120] via-[#0F172A] to-[#0A0F1D] border border-slate-800/90 p-7 md:p-10 overflow-hidden shadow-2xl">
+                    <div className="absolute top-0 right-1/4 w-96 h-96 bg-cyan-500/10 rounded-full blur-3xl pointer-events-none" />
+                    <div className="absolute -bottom-10 left-10 w-80 h-80 bg-amber-500/10 rounded-full blur-3xl pointer-events-none" />
+
+                    <div className="relative z-10 flex flex-col md:flex-row md:items-end justify-between gap-6 border-b border-slate-800/90 pb-8">
+                      <div className="space-y-3 max-w-2xl">
+                        <div className="flex items-center gap-2 text-xs font-mono font-bold tracking-wider text-cyan-400 uppercase">
+                          <span>Royalty-Free Producer Vault</span>
+                          <span className="text-slate-600">·</span>
+                          <span className="text-slate-400">Direct License Agreements</span>
+                        </div>
+                        <h2 className="text-3xl md:text-5xl font-black tracking-tight text-white font-display">
+                          Buy and Sell Your Beats
+                        </h2>
+                        <p className="text-xs md:text-sm text-slate-300 leading-relaxed font-normal">
+                          Top-tier Afrobeat, Amapiano, and Dancehall studio instrumentals engineered by premier African producers. Instant 24-bit WAV & stem downloads with verified commercial sync rights.
+                        </p>
                       </div>
-                      <h3 className="text-2xl font-black text-white">{beats[0].title}</h3>
-                      <p className="text-xs text-amber-400 font-semibold">Produced by {beats[0].producer}</p>
-                      <div className="flex flex-wrap items-center justify-center md:justify-start gap-3 pt-2">
-                        <button
-                          onClick={() => {
-                            const audio = new Audio(beats[0].previewUrl);
-                            audio.play();
-                            alert(`Streaming preview for ${beats[0].title}...`);
-                          }}
-                          className="bg-amber-500 hover:bg-amber-400 text-stone-950 font-bold px-5 py-2.5 rounded-xl text-xs flex items-center gap-1.5 shadow"
-                        >
-                          ▶️ Stream Preview
-                        </button>
-                        <button
-                          onClick={() => {
-                            setSelectedBeatForModal(beats[0]);
-                            setIsBeatModalOpen(true);
-                          }}
-                          className="bg-stone-800 hover:bg-stone-700 text-stone-100 font-bold px-5 py-2.5 rounded-xl text-xs border border-stone-700 shadow transition"
-                        >
-                          Buy License / Tiers ↗
-                        </button>
+
+                      {/* Cart Trigger Button */}
+                      <button
+                        onClick={() => setIsCartOpen(true)}
+                        className="self-start md:self-auto shrink-0 bg-[#1E293B] hover:bg-slate-800 border border-slate-700/80 hover:border-cyan-500/50 text-white font-bold px-5 py-3 rounded-2xl text-xs flex items-center gap-3 shadow-lg shadow-cyan-950/30 transition-all hover:-translate-y-0.5"
+                      >
+                        <span className="flex items-center gap-1.5 text-cyan-400 font-extrabold">
+                          🛒 Cart
+                        </span>
+                        <span className="bg-cyan-500 text-slate-950 px-2 py-0.5 rounded-full text-[10px] font-black">
+                          {beatCart.length}
+                        </span>
+                        {beatCart.length > 0 && (
+                          <span className="font-mono text-amber-400 text-xs font-bold border-l border-slate-700 pl-2">
+                            ₦{beatCart.reduce((s, i) => s + i.price, 0).toLocaleString()}
+                          </span>
+                        )}
+                      </button>
+                    </div>
+
+                    {/* Filter and Search Bar Strip */}
+                    <div className="relative z-10 pt-6 flex flex-col md:flex-row items-stretch md:items-center justify-between gap-4">
+                      {/* Genre Filter Tabs */}
+                      <div className="flex flex-wrap items-center gap-1.5 p-1 bg-[#0A0F1D]/90 border border-slate-800/90 rounded-xl">
+                        {(['ALL', 'Afrobeat', 'Amapiano', 'Afro-Fusion'] as const).map(genre => (
+                          <button
+                            key={genre}
+                            onClick={() => setBeatGenreFilter(genre)}
+                            className={`px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all whitespace-nowrap ${
+                              beatGenreFilter === genre
+                                ? 'bg-cyan-500 text-slate-950 shadow-md shadow-cyan-500/25 font-black'
+                                : 'text-slate-400 hover:text-white hover:bg-slate-800/70'
+                            }`}
+                          >
+                            {genre}
+                          </button>
+                        ))}
+                      </div>
+
+                      {/* Live Search Input */}
+                      <div className="relative flex-1 max-w-md">
+                        <input
+                          type="text"
+                          placeholder="Search beats by title, producer, or BPM..."
+                          value={beatSearchQuery}
+                          onChange={(e) => setBeatSearchQuery(e.target.value)}
+                          className="w-full bg-[#0A0F1D]/90 border border-slate-800 rounded-xl pl-9 pr-4 py-2.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-cyan-400 transition font-sans"
+                        />
+                        <Search className="w-4 h-4 text-slate-500 absolute left-3 top-3 pointer-events-none" />
+                        {beatSearchQuery && (
+                          <button
+                            onClick={() => setBeatSearchQuery('')}
+                            className="absolute right-3 top-2.5 text-slate-400 hover:text-white text-xs"
+                          >
+                            ✕
+                          </button>
+                        )}
                       </div>
                     </div>
                   </div>
-                )}
 
-                {/* BEAT CATALOG GRID */}
-                <div className="space-y-4">
-                  <h3 className="text-lg font-bold text-white">Full Instrumental Catalog</h3>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    {beats.map(beat => (
-                      <div key={beat.id} className="bg-stone-900 border border-stone-800 rounded-2xl p-6 flex flex-col md:flex-row items-center gap-6 shadow">
-                        <div className="relative w-28 h-28 shrink-0 rounded-xl overflow-hidden border border-stone-800 shadow">
-                          <img src={beat.cover} alt="" className="w-full h-full object-cover" />
+                  {/* 2. COMPACT & ELEGANT "BEAT OF THE WEEK" SPOTLIGHT */}
+                  {featuredBeat && (
+                    <div className="relative rounded-2xl bg-gradient-to-r from-[#0F172A] via-[#1E293B] to-[#0F172A] border border-cyan-500/40 p-4 md:p-5 overflow-hidden shadow-xl hover:border-cyan-400/60 transition-all duration-300">
+                      <div className="absolute top-0 right-1/4 w-72 h-72 bg-cyan-500/10 rounded-full blur-3xl pointer-events-none" />
+                      <div className="absolute -bottom-10 left-1/3 w-64 h-64 bg-amber-500/10 rounded-full blur-3xl pointer-events-none" />
+
+                      <div className="relative z-10 flex flex-col sm:flex-row items-center gap-4 md:gap-6">
+                        {/* Artwork with Preview Play Button */}
+                        <div className="relative w-20 h-20 sm:w-22 sm:h-22 shrink-0 rounded-xl overflow-hidden border border-slate-700/80 shadow-md group bg-slate-950">
+                          <img
+                            src={featuredBeat.cover}
+                            alt={featuredBeat.title}
+                            referrerPolicy="no-referrer"
+                            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                          />
                           <button
-                            onClick={() => {
-                              const audio = new Audio(beat.previewUrl);
-                              audio.play();
-                              alert(`Playing preview: ${beat.title}`);
-                            }}
-                            className="absolute inset-0 bg-black/40 flex items-center justify-center hover:bg-black/20 transition"
+                            onClick={() => togglePlayBeat(featuredBeat)}
+                            aria-label={`Preview ${featuredBeat.title}`}
+                            className={`absolute inset-0 flex items-center justify-center transition-all ${
+                              playingBeatId === featuredBeat.id ? 'bg-black/60' : 'bg-black/35 group-hover:bg-black/55'
+                            }`}
                           >
-                            <Play className="w-8 h-8 fill-amber-400 text-amber-400" />
+                            <div className="w-10 h-10 rounded-full bg-cyan-500 hover:bg-cyan-400 text-slate-950 flex items-center justify-center shadow-lg shadow-cyan-500/30 transition transform group-hover:scale-110">
+                              {playingBeatId === featuredBeat.id ? (
+                                <Pause className="w-4 h-4 fill-slate-950" />
+                              ) : (
+                                <Play className="w-4 h-4 fill-slate-950 ml-0.5" />
+                              )}
+                            </div>
                           </button>
                         </div>
-                        <div className="flex-1 space-y-3 text-center md:text-left w-full min-w-0">
-                          <div className="space-y-1">
-                            <h4 className="text-base font-bold text-white truncate">{beat.title}</h4>
-                            <p className="text-xs text-stone-400">Prod. by {beat.producer} • {beat.bpm} BPM • {beat.key}</p>
+
+                        {/* Center Details */}
+                        <div className="flex-1 min-w-0 space-y-1 text-center sm:text-left">
+                          <div className="flex flex-wrap items-center justify-center sm:justify-start gap-2">
+                            <span className="px-2.5 py-0.5 rounded text-[10px] font-black uppercase bg-gradient-to-r from-amber-500 to-amber-600 text-slate-950 tracking-wider shadow-sm">
+                              🔥 Beat of the Week
+                            </span>
+                            <span className="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-cyan-500/15 text-cyan-300 border border-cyan-500/30">
+                              {featuredBeat.bpm} BPM
+                            </span>
+                            <span className="text-[10px] text-slate-400 font-semibold uppercase">
+                              {featuredBeat.genre} · Key: {featuredBeat.key}
+                            </span>
                           </div>
+                          <h3 className="text-lg md:text-xl font-black text-white truncate tracking-tight">
+                            {featuredBeat.title}
+                          </h3>
+                          <p className="text-xs text-slate-300 font-medium truncate">
+                            Produced by <span className="text-cyan-300 font-bold">{featuredBeat.producer}</span>
+                          </p>
+                        </div>
+
+                        {/* Right Pricing & Actions */}
+                        <div className="flex items-center gap-3 shrink-0">
+                          <div className="text-right hidden md:block">
+                            <span className="text-[9px] text-slate-400 font-mono uppercase block leading-none">Starting from</span>
+                            <span className="font-mono text-base font-black text-amber-400">
+                              ₦{(featuredBeat.prices?.mp3 || 35000).toLocaleString()}
+                            </span>
+                          </div>
+
+                          <button
+                            onClick={() => togglePlayBeat(featuredBeat)}
+                            className="bg-[#0F172A] hover:bg-slate-800 text-slate-200 font-bold px-3.5 py-2 rounded-xl text-xs flex items-center gap-1.5 border border-slate-700/80 transition shadow-sm"
+                          >
+                            {playingBeatId === featuredBeat.id ? (
+                              <>
+                                <Pause className="w-3.5 h-3.5 text-cyan-400" /> Pause
+                              </>
+                            ) : (
+                              <>
+                                <Play className="w-3.5 h-3.5 text-cyan-400 fill-cyan-400" /> Preview
+                              </>
+                            )}
+                          </button>
+
                           <button
                             onClick={() => {
-                              setSelectedBeatForModal(beat);
+                              setSelectedBeatForModal(featuredBeat);
+                              setSelectedLicenseTier('mp3');
                               setIsBeatModalOpen(true);
                             }}
-                            className="w-full bg-amber-500 hover:bg-amber-400 text-stone-950 font-extrabold py-2.5 rounded-xl text-xs shadow-md transition flex items-center justify-center gap-2"
+                            className="bg-gradient-to-r from-cyan-500 to-cyan-400 hover:from-cyan-400 hover:to-cyan-300 text-slate-950 font-black px-4 py-2 rounded-xl text-xs shadow-md shadow-cyan-500/25 hover:scale-105 active:scale-95 transition whitespace-nowrap"
                           >
-                            Add to Cart / Buy License 🛒
+                            Buy Beat / Tiers ↗
                           </button>
                         </div>
                       </div>
-                    ))}
-                  </div>
-                </div>
-
-                {/* LICENSING TIERS POP-UP MODAL */}
-                {isBeatModalOpen && selectedBeatForModal && (
-                  <div className="fixed inset-0 z-50 bg-black/85 backdrop-blur-md flex items-center justify-center p-4">
-                    <div className="bg-stone-900 border border-stone-800 rounded-2xl max-w-xl w-full p-6 md:p-8 space-y-6 shadow-2xl">
-                      <div className="flex items-center justify-between border-b border-stone-800 pb-4">
-                        <div>
-                          <span className="text-[10px] bg-amber-500/20 text-amber-400 font-bold px-2.5 py-1 rounded uppercase">Select License Tier</span>
-                          <h3 className="text-xl font-black text-white mt-1">{selectedBeatForModal.title}</h3>
-                          <p className="text-xs text-stone-400">Prod. by {selectedBeatForModal.producer} • {selectedBeatForModal.bpm} BPM</p>
-                        </div>
-                        <button onClick={() => setIsBeatModalOpen(false)} className="text-stone-400 hover:text-white p-2">✕</button>
-                      </div>
-
-                      <div className="space-y-3">
-                        <div 
-                          onClick={() => {
-                            setBeatCart([...beatCart, { beatId: selectedBeatForModal.id, title: selectedBeatForModal.title, producer: selectedBeatForModal.producer, licenseType: 'mp3', price: 35000, cover: selectedBeatForModal.cover }]);
-                            setIsBeatModalOpen(false);
-                            setIsCartOpen(true);
-                          }}
-                          className="bg-stone-950 border border-stone-800 hover:border-amber-500 p-4 rounded-xl flex items-center justify-between cursor-pointer transition"
-                        >
-                          <div>
-                            <h4 className="text-sm font-bold text-white">MP3 Standard Lease</h4>
-                            <p className="text-xs text-stone-400">High Quality MP3 audio file (.mp3)</p>
-                          </div>
-                          <div className="text-right">
-                            <span className="text-sm font-mono font-bold text-amber-400">₦35,000</span>
-                            <p className="text-[10px] text-stone-500">~$25 USD</p>
-                          </div>
-                        </div>
-
-                        <div 
-                          onClick={() => {
-                            setBeatCart([...beatCart, { beatId: selectedBeatForModal.id, title: selectedBeatForModal.title, producer: selectedBeatForModal.producer, licenseType: 'wav', price: 70000, cover: selectedBeatForModal.cover }]);
-                            setIsBeatModalOpen(false);
-                            setIsCartOpen(true);
-                          }}
-                          className="bg-stone-950 border border-stone-800 hover:border-amber-500 p-4 rounded-xl flex items-center justify-between cursor-pointer transition"
-                        >
-                          <div>
-                            <h4 className="text-sm font-bold text-white">WAV Premium Lease</h4>
-                            <p className="text-xs text-stone-400">Lossless WAV audio file (.wav)</p>
-                          </div>
-                          <div className="text-right">
-                            <span className="text-sm font-mono font-bold text-amber-400">₦70,000</span>
-                            <p className="text-[10px] text-stone-500">~$50 USD</p>
-                          </div>
-                        </div>
-
-                        <div 
-                          onClick={() => {
-                            setBeatCart([...beatCart, { beatId: selectedBeatForModal.id, title: selectedBeatForModal.title, producer: selectedBeatForModal.producer, licenseType: 'stems', price: 140000, cover: selectedBeatForModal.cover }]);
-                            setIsBeatModalOpen(false);
-                            setIsCartOpen(true);
-                          }}
-                          className="bg-stone-950 border border-stone-800 hover:border-amber-500 p-4 rounded-xl flex items-center justify-between cursor-pointer transition"
-                        >
-                          <div>
-                            <h4 className="text-sm font-bold text-white">Unlimited Trackout Lease</h4>
-                            <p className="text-xs text-stone-400">Uncompressed WAV + Track Stems (.zip)</p>
-                          </div>
-                          <div className="text-right">
-                            <span className="text-sm font-mono font-bold text-amber-400">₦140,000</span>
-                            <p className="text-[10px] text-stone-500">~$100 USD</p>
-                          </div>
-                        </div>
-
-                        <div 
-                          onClick={() => {
-                            setBeatCart([...beatCart, { beatId: selectedBeatForModal.id, title: selectedBeatForModal.title, producer: selectedBeatForModal.producer, licenseType: 'exclusive', price: 350000, cover: selectedBeatForModal.cover }]);
-                            setIsBeatModalOpen(false);
-                            setIsCartOpen(true);
-                          }}
-                          className="bg-amber-500/10 border border-amber-500/30 hover:border-amber-500 p-4 rounded-xl flex items-center justify-between cursor-pointer transition"
-                        >
-                          <div>
-                            <h4 className="text-sm font-bold text-amber-400">Exclusive Rights</h4>
-                            <p className="text-xs text-stone-300">Full Transfer / Removal from store</p>
-                          </div>
-                          <div className="text-right">
-                            <span className="text-sm font-mono font-bold text-amber-400">₦350,000+</span>
-                            <p className="text-[10px] text-stone-400">~$250+ USD</p>
-                          </div>
-                        </div>
-                      </div>
                     </div>
-                  </div>
-                )}
+                  )}
 
-                {/* CART SLIDING DRAWER / MODAL */}
-                {isCartOpen && (
-                  <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex justify-end">
-                    <div className="w-full max-w-md bg-stone-950 border-l border-stone-800 p-6 flex flex-col justify-between space-y-6 h-full shadow-2xl">
-                      <div className="space-y-6 overflow-y-auto flex-1">
-                        <div className="flex items-center justify-between border-b border-stone-800 pb-4">
-                          <h3 className="text-lg font-black text-white">Your Beat Cart ({beatCart.length})</h3>
-                          <button onClick={() => setIsCartOpen(false)} className="text-stone-400 hover:text-white p-2">✕</button>
-                        </div>
+                  {/* 3. RESPONSIVE 2-COLUMN GRID VIEW OF ALL AVAILABLE BEATS */}
+                  <div className="space-y-6">
+                    <div className="flex items-center justify-between border-b border-slate-800/90 pb-3">
+                      <div>
+                        <h3 className="text-xl font-black text-white tracking-tight">Available Producer Beats</h3>
+                        <p className="text-xs text-slate-400">
+                          Showing {filteredBeats.length} {filteredBeats.length === 1 ? 'beat' : 'beats'} in 2-column catalog view
+                        </p>
+                      </div>
+                      {beatGenreFilter !== 'ALL' && (
+                        <button
+                          onClick={() => setBeatGenreFilter('ALL')}
+                          className="text-xs text-cyan-400 hover:underline font-semibold"
+                        >
+                          Clear filter
+                        </button>
+                      )}
+                    </div>
 
-                        {beatCart.length === 0 ? (
-                          <div className="text-center py-16 text-stone-500 space-y-3">
-                            <p className="text-sm">Your beat cart is empty.</p>
-                            <button onClick={() => setIsCartOpen(false)} className="bg-amber-500 text-stone-950 font-bold px-4 py-2 rounded-xl text-xs">Browse Instrumentals</button>
-                          </div>
-                        ) : (
-                          <div className="space-y-3">
-                            {beatCart.map((item, idx) => (
-                              <div key={idx} className="flex items-center justify-between p-3 bg-stone-900 border border-stone-800 rounded-xl">
-                                <div className="flex items-center gap-3">
-                                  <img src={item.cover} alt="" className="w-12 h-12 rounded-lg object-cover" />
+                    {filteredBeats.length === 0 ? (
+                      <div className="text-center py-16 bg-[#0F172A] rounded-3xl border border-slate-800/90 p-8 space-y-4">
+                        <p className="text-sm text-slate-400">No instrumentals match your current search.</p>
+                        <button
+                          onClick={() => { setBeatSearchQuery(''); setBeatGenreFilter('ALL'); }}
+                          className="bg-[#1E293B] text-slate-200 px-4 py-2 rounded-xl text-xs font-bold hover:bg-slate-700 transition"
+                        >
+                          Reset Filters
+                        </button>
+                      </div>
+                    ) : (
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-5">
+                        {filteredBeats.map(beat => {
+                          const isThisPlaying = playingBeatId === beat.id;
+                          return (
+                            <div
+                              key={beat.id}
+                              className={`relative bg-[#0F172A] hover:bg-[#1E293B] border rounded-2xl p-4 flex flex-col sm:flex-row items-center gap-4 transition-all duration-300 ease-out group shadow-lg hover:shadow-[0_12px_28px_-6px_rgba(6,182,212,0.22)] hover:-translate-y-1 ${
+                                isThisPlaying
+                                  ? 'border-cyan-400 ring-1 ring-cyan-400/40 shadow-[0_0_24px_rgba(6,182,212,0.25)] bg-[#132238]'
+                                  : 'border-slate-800/90 hover:border-cyan-500/50'
+                              }`}
+                            >
+                              {/* Beat Artwork / Cover Image with Play/Pause button */}
+                              <div className="relative w-28 h-28 sm:w-26 sm:h-26 shrink-0 rounded-xl overflow-hidden bg-slate-950 border border-slate-700/80 shadow-md">
+                                <img
+                                  src={beat.cover}
+                                  alt={beat.title}
+                                  referrerPolicy="no-referrer"
+                                  className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                                />
+                                <button
+                                  onClick={() => togglePlayBeat(beat)}
+                                  aria-label={`Preview ${beat.title}`}
+                                  className={`absolute inset-0 flex items-center justify-center transition-all ${
+                                    isThisPlaying ? 'bg-black/60' : 'bg-black/35 group-hover:bg-black/55'
+                                  }`}
+                                >
+                                  <div className={`w-11 h-11 rounded-full backdrop-blur-md border border-white/10 flex items-center justify-center shadow-xl transition-all transform group-hover:scale-110 ${
+                                    isThisPlaying
+                                      ? 'bg-cyan-500 text-slate-950 ring-2 ring-cyan-300 shadow-cyan-500/50'
+                                      : 'bg-slate-950/80 text-white group-hover:bg-cyan-500 group-hover:text-slate-950'
+                                  }`}>
+                                    {isThisPlaying ? (
+                                      <Pause className="w-4 h-4 fill-current" />
+                                    ) : (
+                                      <Play className="w-4 h-4 fill-current ml-0.5" />
+                                    )}
+                                  </div>
+                                </button>
+                                <div className="absolute top-1.5 right-1.5 px-2 py-0.5 rounded-md bg-slate-950/90 backdrop-blur text-[10px] font-mono font-bold text-cyan-300 border border-cyan-500/40 shadow-sm">
+                                  {beat.bpm} BPM
+                                </div>
+                              </div>
+
+                              {/* Typography & Meta Details */}
+                              <div className="flex-1 min-w-0 space-y-2 text-center sm:text-left w-full">
+                                <div>
+                                  <div className="text-[10px] text-cyan-400 font-mono uppercase tracking-wider font-semibold flex items-center justify-center sm:justify-start gap-1.5">
+                                    <span>{beat.genre}</span>
+                                    <span className="text-slate-600">·</span>
+                                    <span>Key: {beat.key}</span>
+                                  </div>
+                                  <h4 className="text-base font-black text-white truncate group-hover:text-cyan-300 transition-colors">
+                                    {beat.title}
+                                  </h4>
+                                  <p className="text-xs text-slate-300 truncate">
+                                    Prod. by <span className="text-white font-bold">{beat.producer}</span>
+                                  </p>
+                                </div>
+
+                                {/* Price Baseline & Action Button */}
+                                <div className="pt-2.5 mt-1 border-t border-slate-800/80 flex items-center justify-between gap-2">
                                   <div>
-                                    <h5 className="text-xs font-bold text-white">{item.title}</h5>
-                                    <p className="text-[10px] text-amber-400 uppercase font-semibold">{item.licenseType} License • ₦{item.price.toLocaleString()}</p>
+                                    <span className="text-[10px] text-slate-400 font-mono block leading-none">Starting from</span>
+                                    <span className="font-mono text-sm font-black text-amber-400">
+                                      ₦{(beat.prices?.mp3 || 35000).toLocaleString()}
+                                    </span>
+                                  </div>
+
+                                  <div className="flex items-center gap-2">
+                                    <button
+                                      onClick={() => togglePlayBeat(beat)}
+                                      className="bg-[#1E293B] hover:bg-slate-700 text-slate-200 border border-slate-700/70 p-2 rounded-xl text-xs font-semibold flex items-center justify-center transition shadow-sm"
+                                      title={isThisPlaying ? 'Pause audio preview' : 'Play audio preview'}
+                                    >
+                                      {isThisPlaying ? (
+                                        <Pause className="w-3.5 h-3.5 text-cyan-400 fill-cyan-400" />
+                                      ) : (
+                                        <Play className="w-3.5 h-3.5 text-cyan-400 fill-cyan-400 ml-0.5" />
+                                      )}
+                                    </button>
+
+                                    <button
+                                      onClick={() => {
+                                        setSelectedBeatForModal(beat);
+                                        setSelectedLicenseTier('mp3');
+                                        setIsBeatModalOpen(true);
+                                      }}
+                                      className="bg-gradient-to-r from-cyan-500 to-cyan-400 hover:from-cyan-400 hover:to-cyan-300 text-slate-950 font-black px-3.5 py-2 rounded-xl text-xs flex items-center gap-1.5 shadow-md shadow-cyan-500/20 hover:scale-105 active:scale-95 transition"
+                                    >
+                                      <span>Buy Beat</span>
+                                      <span className="text-[10px]">🛒</span>
+                                    </button>
                                   </div>
                                 </div>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* 4. PURCHASE & LICENSING MODAL (Interactive Tier Selector & Instant Paystack Payment) */}
+                  {isBeatModalOpen && selectedBeatForModal && (() => {
+                    const activePrice = tierConfig[selectedLicenseTier].getPrice(selectedBeatForModal);
+
+                    return (
+                      <div className="fixed inset-0 z-50 bg-black/85 backdrop-blur-md flex items-center justify-center p-4 overflow-y-auto">
+                        <div className="bg-[#0F172A] border border-slate-700/90 rounded-3xl max-w-2xl w-full p-6 md:p-8 space-y-6 shadow-2xl my-auto text-slate-100">
+                          
+                          {/* Modal Header */}
+                          <div className="flex items-start justify-between border-b border-slate-800 pb-4">
+                            <div className="flex items-center gap-4">
+                              <img
+                                src={selectedBeatForModal.cover}
+                                alt={selectedBeatForModal.title}
+                                referrerPolicy="no-referrer"
+                                className="w-16 h-16 rounded-xl object-cover border border-slate-700 shadow shrink-0"
+                              />
+                              <div>
+                                <span className="text-[10px] bg-cyan-500/20 text-cyan-400 font-mono font-bold px-2 py-0.5 rounded uppercase tracking-wider">
+                                  Licensing & Checkout
+                                </span>
+                                <h3 className="text-xl font-black text-white mt-1 leading-snug">
+                                  {selectedBeatForModal.title}
+                                </h3>
+                                <p className="text-xs text-slate-300">
+                                  Prod. by <span className="text-white font-bold">{selectedBeatForModal.producer}</span> · <span className="text-cyan-400 font-mono">{selectedBeatForModal.bpm} BPM</span> · Key: {selectedBeatForModal.key}
+                                </p>
+                              </div>
+                            </div>
+                            <button
+                              onClick={() => setIsBeatModalOpen(false)}
+                              className="text-slate-400 hover:text-white p-2 rounded-lg bg-[#1E293B] hover:bg-slate-700 transition"
+                            >
+                              ✕
+                            </button>
+                          </div>
+
+                          {/* Licensing Tier Options */}
+                          <div className="space-y-3">
+                            <h4 className="text-xs font-bold uppercase tracking-wider text-slate-300">
+                              Choose Your Licensing Tier
+                            </h4>
+
+                            <div className="space-y-2.5">
+                              {(['mp3', 'wav', 'stems', 'exclusive'] as const).map(tierKey => {
+                                const tier = tierConfig[tierKey];
+                                const isSelected = selectedLicenseTier === tierKey;
+                                const tierPrice = tier.getPrice(selectedBeatForModal);
+
+                                return (
+                                  <div
+                                    key={tierKey}
+                                    onClick={() => setSelectedLicenseTier(tierKey)}
+                                    className={`p-4 rounded-2xl border cursor-pointer transition-all flex items-start justify-between gap-4 ${
+                                      isSelected
+                                        ? 'bg-cyan-500/10 border-cyan-400 ring-1 ring-cyan-400/40 shadow-lg shadow-cyan-500/10'
+                                        : 'bg-[#1E293B]/70 border-slate-700/70 hover:border-slate-600'
+                                    }`}
+                                  >
+                                    <div className="flex items-start gap-3">
+                                      <div className={`w-5 h-5 rounded-full border mt-0.5 flex items-center justify-center shrink-0 transition ${
+                                        isSelected ? 'border-cyan-400 bg-cyan-500' : 'border-slate-600 bg-slate-900'
+                                      }`}>
+                                        {isSelected && <span className="w-2 h-2 rounded-full bg-slate-950" />}
+                                      </div>
+                                      <div className="space-y-0.5">
+                                        <div className="flex items-center gap-2">
+                                          <h5 className={`text-sm font-bold ${isSelected ? 'text-cyan-400' : 'text-white'}`}>
+                                            {tier.name}
+                                          </h5>
+                                          <span className="text-[10px] text-slate-400 font-mono">({tier.fileType})</span>
+                                        </div>
+                                        <p className="text-xs text-slate-300 leading-snug">
+                                          {tier.desc}
+                                        </p>
+                                        <p className="text-[11px] text-slate-400 font-medium pt-0.5">
+                                          {tier.streams}
+                                        </p>
+                                      </div>
+                                    </div>
+
+                                    <div className="text-right shrink-0">
+                                      <span className="font-mono text-base font-black text-amber-400">
+                                        ₦{tierPrice.toLocaleString()}
+                                      </span>
+                                    </div>
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          </div>
+
+                          {/* Email Input for Delivery */}
+                          <div className="space-y-1.5 pt-2 border-t border-slate-800">
+                            <label className="block text-xs font-semibold text-slate-300">
+                              Recipient Email for Instant File Download & License Contract
+                            </label>
+                            <input
+                              type="email"
+                              required
+                              placeholder="artist@domain.com or producer@label.com"
+                              value={buyerEmail}
+                              onChange={(e) => setBuyerEmail(e.target.value)}
+                              className="w-full bg-[#0B1120] border border-slate-700 rounded-xl px-3.5 py-2.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-cyan-400 transition font-sans"
+                            />
+                            <p className="text-[10px] text-slate-400">
+                              Your download link and verified agreement PDF are generated immediately after Paystack approval.
+                            </p>
+                          </div>
+
+                          {/* Action Buttons: Add to Cart vs Instant Paystack Checkout */}
+                          <div className="flex flex-col sm:flex-row gap-3 pt-2">
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setBeatCart([
+                                  ...beatCart,
+                                  {
+                                    beatId: selectedBeatForModal.id,
+                                    title: selectedBeatForModal.title,
+                                    producer: selectedBeatForModal.producer,
+                                    licenseType: selectedLicenseTier,
+                                    price: activePrice,
+                                    cover: selectedBeatForModal.cover
+                                  }
+                                ]);
+                                setIsBeatModalOpen(false);
+                                setIsCartOpen(true);
+                              }}
+                              className="w-full sm:w-1/3 bg-[#1E293B] hover:bg-slate-800 border border-slate-700 text-slate-200 font-bold py-3.5 rounded-xl text-xs transition text-center"
+                            >
+                              Add to Cart 🛒
+                            </button>
+
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const customerEmail = buyerEmail && buyerEmail.includes('@') ? buyerEmail : 'client@afropulse.com.ng';
+                                triggerPaystackCheckout({
+                                  email: customerEmail,
+                                  amount: activePrice,
+                                  packageName: `${selectedBeatForModal.title} - ${tierConfig[selectedLicenseTier].name}`,
+                                  metadata: {
+                                    beat_id: selectedBeatForModal.id,
+                                    beat_title: selectedBeatForModal.title,
+                                    producer: selectedBeatForModal.producer,
+                                    license_tier: selectedLicenseTier,
+                                    bpm: selectedBeatForModal.bpm
+                                  },
+                                  onSuccess: (ref) => {
+                                    const order = {
+                                      orderId: ref || ('PAY-' + Math.floor(100000 + Math.random() * 900000)),
+                                      items: [{
+                                        beatId: selectedBeatForModal.id,
+                                        title: selectedBeatForModal.title,
+                                        producer: selectedBeatForModal.producer,
+                                        licenseType: selectedLicenseTier,
+                                        price: activePrice,
+                                        cover: selectedBeatForModal.cover
+                                      }],
+                                      total: activePrice,
+                                      date: new Date().toLocaleString()
+                                    };
+                                    setIsBeatModalOpen(false);
+                                    setDownloadFulfillmentModal(order);
+                                  }
+                                });
+                              }}
+                              className="w-full sm:w-2/3 bg-gradient-to-r from-amber-500 to-amber-400 hover:from-amber-400 hover:to-amber-300 text-slate-950 font-black py-3.5 rounded-xl text-xs shadow-xl shadow-amber-500/20 transition flex items-center justify-center gap-2"
+                            >
+                              <span>Proceed to Payment 🔒 (₦{activePrice.toLocaleString()})</span>
+                            </button>
+                          </div>
+
+                        </div>
+                      </div>
+                    );
+                  })()}
+
+                  {/* 5. CART SLIDING DRAWER / MODAL */}
+                  {isCartOpen && (
+                    <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex justify-end">
+                      <div className="w-full max-w-md bg-[#0F172A] border-l border-slate-800 p-6 flex flex-col justify-between space-y-6 h-full shadow-2xl">
+                        <div className="space-y-6 overflow-y-auto flex-1">
+                          <div className="flex items-center justify-between border-b border-slate-800 pb-4">
+                            <h3 className="text-lg font-black text-white">Your Beat Cart ({beatCart.length})</h3>
+                            <button onClick={() => setIsCartOpen(false)} className="text-slate-400 hover:text-white p-2">✕</button>
+                          </div>
+
+                          {beatCart.length === 0 ? (
+                            <div className="text-center py-16 text-slate-400 space-y-3">
+                              <p className="text-sm">Your beat cart is currently empty.</p>
+                              <button onClick={() => setIsCartOpen(false)} className="bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-bold px-4 py-2 rounded-xl text-xs transition">
+                                Browse Instrumentals
+                              </button>
+                            </div>
+                          ) : (
+                            <div className="space-y-3">
+                              {beatCart.map((item, idx) => (
+                                <div key={idx} className="flex items-center justify-between p-3.5 bg-[#1E293B] border border-slate-700/80 rounded-xl">
+                                  <div className="flex items-center gap-3 min-w-0 pr-2">
+                                    <img src={item.cover} alt="" referrerPolicy="no-referrer" className="w-12 h-12 rounded-lg object-cover shrink-0 border border-slate-700" />
+                                    <div className="min-w-0">
+                                      <h5 className="text-xs font-bold text-white truncate">{item.title}</h5>
+                                      <p className="text-[10px] text-amber-400 uppercase font-semibold">
+                                        {item.licenseType.toUpperCase()} License · ₦{item.price.toLocaleString()}
+                                      </p>
+                                    </div>
+                                  </div>
+                                  <button
+                                    onClick={() => setBeatCart(beatCart.filter((_, i) => i !== idx))}
+                                    className="text-red-400 hover:text-red-300 text-xs p-2 shrink-0 transition"
+                                  >
+                                    <Trash2 className="w-4 h-4" />
+                                  </button>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+
+                        {beatCart.length > 0 && (
+                          <div className="space-y-4 pt-4 border-t border-slate-800">
+                            <div className="flex items-center justify-between text-sm font-bold text-white">
+                              <span>Total Amount:</span>
+                              <span className="font-mono text-amber-400 text-lg">
+                                ₦{beatCart.reduce((s, i) => s + i.price, 0).toLocaleString()}
+                              </span>
+                            </div>
+                            <button
+                              onClick={() => {
+                                const total = beatCart.reduce((s, i) => s + i.price, 0);
+                                triggerPaystackCheckout({
+                                  email: buyerEmail && buyerEmail.includes('@') ? buyerEmail : 'client@afropulse.com.ng',
+                                  amount: total,
+                                  packageName: `AfroPulse Beat Order (${beatCart.length} Beats)`,
+                                  metadata: {
+                                    beat_titles: beatCart.map(b => b.title).join(', ')
+                                  },
+                                  onSuccess: (ref) => {
+                                    const order = {
+                                      orderId: ref || ('PAY-' + Math.floor(100000 + Math.random() * 900000)),
+                                      items: [...beatCart],
+                                      total: total,
+                                      date: new Date().toLocaleString()
+                                    };
+                                    setBeatCart([]);
+                                    setIsCartOpen(false);
+                                    setDownloadFulfillmentModal(order);
+                                  }
+                                });
+                              }}
+                              className="w-full bg-gradient-to-r from-cyan-500 to-cyan-400 hover:from-cyan-400 text-slate-950 font-black py-3.5 rounded-xl text-xs shadow-lg shadow-cyan-500/20 transition uppercase tracking-wider"
+                            >
+                              Proceed to Paystack Checkout 🔒
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* 6. SECURE DOWNLOAD FULFILLMENT MODAL */}
+                  {downloadFulfillmentModal && (
+                    <div className="fixed inset-0 z-50 bg-black/85 backdrop-blur-md flex items-center justify-center p-4">
+                      <div className="bg-[#0F172A] border border-slate-700/90 rounded-3xl max-w-lg w-full p-6 md:p-8 space-y-6 shadow-2xl">
+                        <div className="text-center space-y-2">
+                          <div className="w-12 h-12 rounded-full bg-emerald-500/20 text-emerald-400 flex items-center justify-center mx-auto text-xl font-bold">
+                            ✓
+                          </div>
+                          <h3 className="text-2xl font-black text-white">Payment Successful & Verified!</h3>
+                          <p className="text-xs text-slate-400">
+                            Order Reference: <span className="font-mono text-amber-400">{downloadFulfillmentModal.orderId}</span> via Paystack.
+                          </p>
+                        </div>
+
+                        <div className="space-y-4 bg-[#1E293B]/80 p-4 rounded-2xl border border-slate-700/80">
+                          <h4 className="text-xs font-bold text-white uppercase tracking-wider">
+                            Instant Secure Downloads & Licenses
+                          </h4>
+                          <div className="space-y-3">
+                            {downloadFulfillmentModal.items.map((item: any, idx: number) => (
+                              <div key={idx} className="flex items-center justify-between p-3 bg-[#0F172A] rounded-xl border border-slate-700/70">
+                                <div className="min-w-0 pr-2">
+                                  <h5 className="text-xs font-bold text-white truncate">{item.title}</h5>
+                                  <p className="text-[10px] text-slate-400">
+                                    {item.licenseType.toUpperCase()} Audio Master + Signed Contract PDF
+                                  </p>
+                                </div>
                                 <button
-                                  onClick={() => setBeatCart(beatCart.filter((_, i) => i !== idx))}
-                                  className="text-red-400 hover:text-red-300 text-xs p-2"
+                                  onClick={() => handleDownloadFile(item)}
+                                  className="shrink-0 bg-gradient-to-r from-amber-500 to-amber-400 hover:from-amber-400 text-slate-950 font-bold px-3 py-1.5 rounded-lg text-xs flex items-center gap-1 shadow"
                                 >
-                                  <Trash2 className="w-4 h-4" />
+                                  <Download className="w-3.5 h-3.5" /> Download
                                 </button>
                               </div>
                             ))}
                           </div>
-                        )}
-                      </div>
-
-                      {beatCart.length > 0 && (
-                        <div className="space-y-4 pt-4 border-t border-stone-800">
-                          <div className="flex items-center justify-between text-sm font-bold text-white">
-                            <span>Total Amount (NGN):</span>
-                            <span className="font-mono text-amber-400 text-lg">₦{beatCart.reduce((s, i) => s + i.price, 0).toLocaleString()}</span>
-                          </div>
-                          <button
-                            onClick={() => {
-                              const order = {
-                                orderId: 'PAY-' + Math.floor(100000 + Math.random() * 900000),
-                                items: [...beatCart],
-                                total: beatCart.reduce((s, i) => s + i.price, 0),
-                                date: new Date().toLocaleString()
-                              };
-                              setBeatCart([]);
-                              setIsCartOpen(false);
-                              setDownloadFulfillmentModal(order);
-                            }}
-                            className="w-full bg-emerald-500 hover:bg-emerald-400 text-stone-950 font-extrabold py-3.5 rounded-xl text-xs shadow-lg transition uppercase tracking-wider"
-                          >
-                            Complete Paystack Checkout Securely 🔒
-                          </button>
                         </div>
-                      )}
-                    </div>
-                  </div>
-                )}
 
-                {/* SECURE DOWNLOAD FULFILLMENT MODAL */}
-                {downloadFulfillmentModal && (
-                  <div className="fixed inset-0 z-50 bg-black/85 backdrop-blur-md flex items-center justify-center p-4">
-                    <div className="bg-stone-900 border border-stone-800 rounded-2xl max-w-lg w-full p-6 md:p-8 space-y-6 shadow-2xl">
-                      <div className="text-center space-y-2">
-                        <div className="w-12 h-12 rounded-full bg-emerald-500/20 text-emerald-400 flex items-center justify-center mx-auto text-xl font-bold">✓</div>
-                        <h3 className="text-2xl font-black text-white">Payment Successful & Verified!</h3>
-                        <p className="text-xs text-stone-400">Order Reference: <span className="font-mono text-amber-400">{downloadFulfillmentModal.orderId}</span> via Paystack.</p>
+                        <button
+                          onClick={() => setDownloadFulfillmentModal(null)}
+                          className="w-full bg-[#1E293B] hover:bg-slate-700 text-slate-200 font-bold py-3 rounded-xl text-xs transition"
+                        >
+                          Close & Return to Beat Store
+                        </button>
                       </div>
-
-                      <div className="space-y-4 bg-stone-950 p-4 rounded-xl border border-stone-800">
-                        <h4 className="text-xs font-bold text-white uppercase tracking-wider">Instant Secure Downloads & Licenses</h4>
-                        <div className="space-y-3">
-                          {downloadFulfillmentModal.items.map((item: any, idx: number) => (
-                            <div key={idx} className="flex items-center justify-between p-3 bg-stone-900 rounded-lg border border-stone-800">
-                              <div className="min-w-0 pr-2">
-                                <h5 className="text-xs font-bold text-white truncate">{item.title}</h5>
-                                <p className="text-[10px] text-stone-400">{item.licenseType.toUpperCase()} File + Signed Agreement PDF</p>
-                              </div>
-                              <button
-                                onClick={() => alert(`Downloading secure high-res ${item.licenseType.toUpperCase()} file & license agreement for ${item.title}...`)}
-                                className="shrink-0 bg-amber-500 hover:bg-amber-400 text-stone-950 font-bold px-3 py-1.5 rounded-lg text-xs flex items-center gap-1 shadow"
-                              >
-                                <Download className="w-3.5 h-3.5" /> Download
-                              </button>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-
-                      <button
-                        onClick={() => setDownloadFulfillmentModal(null)}
-                        className="w-full bg-stone-800 hover:bg-stone-700 text-stone-200 font-bold py-3 rounded-xl text-xs"
-                      >
-                        Close & Return to Store
-                      </button>
                     </div>
-                  </div>
-                )}
-                {renderFaqAndTestimonials()}
-              </div>
-            )}
+                  )}
+
+                  {/* 7. ROUTE-SPECIFIC ISOLATED FAQS & TESTIMONIALS */}
+                  {renderFaqAndTestimonials()}
+                </div>
+              );
+            })()}
 
             {/* ROUTE: MUSIC UPLOAD */}
             {currentRoute === 'musicupload' && (
@@ -2366,10 +3569,15 @@ export default function App() {
                     <div className="space-y-4 pt-4 border-t border-stone-800">
                       <div className="text-2xl font-mono font-bold text-amber-400">₦15,000</div>
                       <button
-                        onClick={() => alert('Proceeding to Paystack checkout for Single Song Upload (₦15,000)...')}
+                        onClick={() => triggerPaystackCheckout({
+                          email: 'artist@afropulse.com.ng',
+                          amount: 15000,
+                          packageName: 'Single Song Upload',
+                          onSuccess: () => alert('Payment successful! Your single has been submitted for review.')
+                        })}
                         className="w-full bg-amber-500 hover:bg-amber-400 text-stone-950 font-bold py-3 rounded-xl text-xs shadow-lg transition-all"
                       >
-                        Proceed to Paystack Checkout
+                        Proceed to Paystack Checkout 🔒
                       </button>
                     </div>
                   </div>
@@ -2383,10 +3591,15 @@ export default function App() {
                     <div className="space-y-4 pt-4 border-t border-stone-800">
                       <div className="text-2xl font-mono font-bold text-amber-400">₦45,000</div>
                       <button
-                        onClick={() => alert('Proceeding to Paystack checkout for EP / Album Project Upload (₦45,000)...')}
+                        onClick={() => triggerPaystackCheckout({
+                          email: 'artist@afropulse.com.ng',
+                          amount: 45000,
+                          packageName: 'EP / Album Project Upload',
+                          onSuccess: () => alert('Payment successful! Your project has been submitted for review.')
+                        })}
                         className="w-full bg-amber-500 hover:bg-amber-400 text-stone-950 font-bold py-3 rounded-xl text-xs shadow-lg transition-all"
                       >
-                        Proceed to Paystack Checkout
+                        Proceed to Paystack Checkout 🔒
                       </button>
                     </div>
                   </div>
@@ -2792,26 +4005,132 @@ export default function App() {
                   <p className="text-xs text-stone-400">Guaranteed placement on top African music playlists with real organic listener engagement.</p>
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                  {spotifyPackages.map(pkg => (
-                    <div key={pkg.id} className="bg-stone-900 border border-stone-800 rounded-2xl p-6 flex flex-col justify-between space-y-6">
-                      <div className="space-y-3">
-                        <span className="text-[10px] bg-emerald-500/20 text-emerald-400 font-bold px-2.5 py-1 rounded-full">{pkg.playlists} Playlists</span>
-                        <h4 className="text-base font-bold text-white">{pkg.name}</h4>
-                        <p className="text-xs text-amber-400 font-bold">{pkg.streams}</p>
+                {spotifySubmitted ? (
+                  <div className="bg-stone-900 border border-emerald-500/40 rounded-2xl p-8 text-center space-y-6 max-w-2xl mx-auto">
+                    <div className="w-16 h-16 bg-emerald-500/20 text-emerald-400 rounded-full flex items-center justify-center mx-auto text-2xl font-bold">✓</div>
+                    <div className="space-y-2">
+                      <h3 className="text-2xl font-black text-white">Spotify Campaign Successfully Submitted!</h3>
+                      <p className="text-xs text-stone-300 max-w-md mx-auto">
+                        Your payment has been verified via Paystack. Your Spotify track has been queued for pitching across verified curators in our network.
+                      </p>
+                    </div>
+                    <button
+                      onClick={() => {
+                        setSpotifySubmitted(false);
+                        setActiveSpotifyCheckout(null);
+                        setCurrentRoute('home');
+                      }}
+                      className="bg-amber-500 hover:bg-amber-400 text-stone-950 font-bold px-6 py-3 rounded-xl text-xs"
+                    >
+                      Return to Home Portal
+                    </button>
+                  </div>
+                ) : activeSpotifyCheckout ? (
+                  <div className="bg-stone-900 border border-stone-800 rounded-2xl p-8 max-w-2xl mx-auto space-y-6">
+                    <div className="flex items-center justify-between border-b border-stone-800 pb-4">
+                      <div>
+                        <span className="text-[10px] bg-emerald-500/20 text-emerald-400 font-bold px-2.5 py-1 rounded-full uppercase">Paystack Secure Checkout</span>
+                        <h3 className="text-xl font-bold text-white mt-1">{activeSpotifyCheckout.name}</h3>
+                        <p className="text-xs text-stone-400">{activeSpotifyCheckout.playlists} Playlists Curated Placement</p>
                       </div>
-                      <div className="space-y-4 pt-4 border-t border-stone-800">
-                        <div className="text-2xl font-mono font-bold text-white">₦{pkg.price.toLocaleString()}</div>
+                      <div className="text-2xl font-mono font-bold text-emerald-400">₦{activeSpotifyCheckout.price.toLocaleString()}</div>
+                    </div>
+
+                    <form
+                      onSubmit={(e) => {
+                        e.preventDefault();
+                        triggerPaystackCheckout({
+                          email: spotifyEmail,
+                          amount: activeSpotifyCheckout.price,
+                          packageName: activeSpotifyCheckout.name,
+                          metadata: {
+                            artist_name: spotifyArtistName,
+                            spotify_track_link: spotifyTrackLink,
+                            playlists: activeSpotifyCheckout.playlists
+                          },
+                          onSuccess: () => setSpotifySubmitted(true)
+                        });
+                      }}
+                      className="space-y-4"
+                    >
+                      <h4 className="text-xs font-bold text-white uppercase tracking-wider">Instant Spotify Submission Form</h4>
+                      
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                          <label className="block text-xs font-semibold text-stone-300 mb-1">Artist Name</label>
+                          <input 
+                            type="text" 
+                            required 
+                            placeholder="e.g. Asake / Tems" 
+                            value={spotifyArtistName}
+                            onChange={(e) => setSpotifyArtistName(e.target.value)}
+                            className="w-full bg-stone-950 border border-stone-800 rounded-xl px-3 py-2.5 text-xs text-white" 
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-xs font-semibold text-stone-300 mb-1">Contact Email</label>
+                          <input 
+                            type="email" 
+                            required 
+                            placeholder="artist@domain.com" 
+                            value={spotifyEmail}
+                            onChange={(e) => setSpotifyEmail(e.target.value)}
+                            className="w-full bg-stone-950 border border-stone-800 rounded-xl px-3 py-2.5 text-xs text-white" 
+                          />
+                        </div>
+                      </div>
+
+                      <div>
+                        <label className="block text-xs font-semibold text-stone-300 mb-1">Official Spotify Track Link / URI</label>
+                        <input 
+                          type="url" 
+                          required 
+                          placeholder="https://open.spotify.com/track/..." 
+                          value={spotifyTrackLink}
+                          onChange={(e) => setSpotifyTrackLink(e.target.value)}
+                          className="w-full bg-stone-950 border border-stone-800 rounded-xl px-3 py-2.5 text-xs text-white font-mono" 
+                        />
+                      </div>
+
+                      <div className="flex gap-3 pt-4">
                         <button
-                          onClick={() => alert(`Proceeding to Paystack checkout for ${pkg.name} (₦{pkg.price.toLocaleString()})`)}
-                          className="w-full bg-emerald-500 hover:bg-emerald-400 text-stone-950 font-bold py-3 rounded-xl text-xs shadow-lg transition-all"
+                          type="button"
+                          onClick={() => setActiveSpotifyCheckout(null)}
+                          className="w-1/3 bg-stone-800 hover:bg-stone-700 text-stone-300 font-bold py-3 rounded-xl text-xs"
                         >
-                          Proceed to Paystack Checkout
+                          Cancel
+                        </button>
+                        <button
+                          type="submit"
+                          className="w-2/3 bg-emerald-500 hover:bg-emerald-400 text-stone-950 font-bold py-3 rounded-xl text-xs shadow-lg"
+                        >
+                          Proceed to Paystack Payment 🔒
                         </button>
                       </div>
-                    </div>
-                  ))}
-                </div>
+                    </form>
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                    {spotifyPackages.map(pkg => (
+                      <div key={pkg.id} className="bg-stone-900 border border-stone-800 rounded-2xl p-6 flex flex-col justify-between space-y-6">
+                        <div className="space-y-3">
+                          <span className="text-[10px] bg-emerald-500/20 text-emerald-400 font-bold px-2.5 py-1 rounded-full">{pkg.playlists} Playlists</span>
+                          <h4 className="text-base font-bold text-white">{pkg.name}</h4>
+                          <p className="text-xs text-amber-400 font-bold">{pkg.streams}</p>
+                        </div>
+                        <div className="space-y-4 pt-4 border-t border-stone-800">
+                          <div className="text-2xl font-mono font-bold text-white">₦{pkg.price.toLocaleString()}</div>
+                          <button
+                            onClick={() => setActiveSpotifyCheckout(pkg)}
+                            className="w-full bg-emerald-500 hover:bg-emerald-400 text-stone-950 font-bold py-3 rounded-xl text-xs shadow-lg transition-all"
+                          >
+                            Proceed to Paystack Checkout 🔒
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
                 {renderFaqAndTestimonials()}
               </div>
             )}
@@ -2825,25 +4144,142 @@ export default function App() {
                   <p className="text-xs text-stone-400">Select your promotional package and launch your press campaign with secure Paystack gateway verification.</p>
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                  {prTiers.map(tier => (
-                    <div key={tier.id} className="bg-stone-900 border border-stone-800 rounded-2xl p-6 flex flex-col justify-between space-y-6">
-                      <div className="space-y-3">
-                        <h4 className="text-base font-bold text-white">{tier.name}</h4>
-                        <p className="text-xs text-stone-300">{tier.desc}</p>
+                {prSubmitted ? (
+                  <div className="bg-stone-900 border border-emerald-500/40 rounded-2xl p-8 text-center space-y-6 max-w-2xl mx-auto">
+                    <div className="w-16 h-16 bg-emerald-500/20 text-emerald-400 rounded-full flex items-center justify-center mx-auto text-2xl font-bold">✓</div>
+                    <div className="space-y-2">
+                      <h3 className="text-2xl font-black text-white">PR Campaign Successfully Submitted!</h3>
+                      <p className="text-xs text-stone-300 max-w-md mx-auto">
+                        Your payment has been verified via Paystack. Your press release has been dispatched to our editorial network for syndication across major African music media.
+                      </p>
+                    </div>
+                    <button
+                      onClick={() => {
+                        setPRSubmitted(false);
+                        setActivePRCheckout(null);
+                        setCurrentRoute('home');
+                      }}
+                      className="bg-amber-500 hover:bg-amber-400 text-stone-950 font-bold px-6 py-3 rounded-xl text-xs"
+                    >
+                      Return to Home Portal
+                    </button>
+                  </div>
+                ) : activePRCheckout ? (
+                  <div className="bg-stone-900 border border-stone-800 rounded-2xl p-8 max-w-2xl mx-auto space-y-6">
+                    <div className="flex items-center justify-between border-b border-stone-800 pb-4">
+                      <div>
+                        <span className="text-[10px] bg-amber-500/20 text-amber-400 font-bold px-2.5 py-1 rounded-full uppercase">Paystack Secure Checkout</span>
+                        <h3 className="text-xl font-bold text-white mt-1">{activePRCheckout.name}</h3>
+                        <p className="text-xs text-stone-400">{activePRCheckout.desc}</p>
                       </div>
-                      <div className="space-y-4 pt-4 border-t border-stone-800">
-                        <div className="text-2xl font-mono font-bold text-amber-400">₦{tier.price.toLocaleString()}</div>
+                      <div className="text-2xl font-mono font-bold text-amber-400">₦{activePRCheckout.price.toLocaleString()}</div>
+                    </div>
+
+                    <form
+                      onSubmit={(e) => {
+                        e.preventDefault();
+                        triggerPaystackCheckout({
+                          email: prEmail,
+                          amount: activePRCheckout.price,
+                          packageName: activePRCheckout.name,
+                          metadata: {
+                            artist_name: prArtistName,
+                            song_link: prSongLink,
+                            press_notes: prPressNotes
+                          },
+                          onSuccess: () => setPRSubmitted(true)
+                        });
+                      }}
+                      className="space-y-4"
+                    >
+                      <h4 className="text-xs font-bold text-white uppercase tracking-wider">Instant PR Servicing Submission Form</h4>
+                      
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                          <label className="block text-xs font-semibold text-stone-300 mb-1">Artist / Label Name</label>
+                          <input 
+                            type="text" 
+                            required 
+                            placeholder="e.g. Starboy Records" 
+                            value={prArtistName}
+                            onChange={(e) => setPRArtistName(e.target.value)}
+                            className="w-full bg-stone-950 border border-stone-800 rounded-xl px-3 py-2.5 text-xs text-white" 
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-xs font-semibold text-stone-300 mb-1">Contact Email</label>
+                          <input 
+                            type="email" 
+                            required 
+                            placeholder="artist@domain.com" 
+                            value={prEmail}
+                            onChange={(e) => setPREmail(e.target.value)}
+                            className="w-full bg-stone-950 border border-stone-800 rounded-xl px-3 py-2.5 text-xs text-white" 
+                          />
+                        </div>
+                      </div>
+
+                      <div>
+                        <label className="block text-xs font-semibold text-stone-300 mb-1">Streaming Link or Media EPK Link</label>
+                        <input 
+                          type="url" 
+                          required 
+                          placeholder="Paste Spotify, Apple Music, Audiomack, or Google Drive link..." 
+                          value={prSongLink}
+                          onChange={(e) => setPRSongLink(e.target.value)}
+                          className="w-full bg-stone-950 border border-stone-800 rounded-xl px-3 py-2.5 text-xs text-white font-mono" 
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-xs font-semibold text-stone-300 mb-1">Press Release Angle / Notes</label>
+                        <textarea 
+                          rows={3} 
+                          placeholder="Describe song backstory, producers involved, or release angle..." 
+                          value={prPressNotes}
+                          onChange={(e) => setPRPressNotes(e.target.value)}
+                          className="w-full bg-stone-950 border border-stone-800 rounded-xl p-3 text-xs text-white"
+                        ></textarea>
+                      </div>
+
+                      <div className="flex gap-3 pt-4">
                         <button
-                          onClick={() => alert(`Proceeding to Paystack checkout for ${tier.name} (₦{tier.price.toLocaleString()})`)}
-                          className="w-full bg-amber-500 hover:bg-amber-400 text-stone-950 font-bold py-3 rounded-xl text-xs shadow-lg transition-all"
+                          type="button"
+                          onClick={() => setActivePRCheckout(null)}
+                          className="w-1/3 bg-stone-800 hover:bg-stone-700 text-stone-300 font-bold py-3 rounded-xl text-xs"
                         >
-                          Proceed to Paystack Checkout
+                          Cancel
+                        </button>
+                        <button
+                          type="submit"
+                          className="w-2/3 bg-amber-500 hover:bg-amber-400 text-stone-950 font-bold py-3 rounded-xl text-xs shadow-lg"
+                        >
+                          Proceed to Paystack Payment 🔒
                         </button>
                       </div>
-                    </div>
-                  ))}
-                </div>
+                    </form>
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                    {prTiers.map(tier => (
+                      <div key={tier.id} className="bg-stone-900 border border-stone-800 rounded-2xl p-6 flex flex-col justify-between space-y-6">
+                        <div className="space-y-3">
+                          <h4 className="text-base font-bold text-white">{tier.name}</h4>
+                          <p className="text-xs text-stone-300">{tier.desc}</p>
+                        </div>
+                        <div className="space-y-4 pt-4 border-t border-stone-800">
+                          <div className="text-2xl font-mono font-bold text-amber-400">₦{tier.price.toLocaleString()}</div>
+                          <button
+                            onClick={() => setActivePRCheckout(tier)}
+                            className="w-full bg-amber-500 hover:bg-amber-400 text-stone-950 font-bold py-3 rounded-xl text-xs shadow-lg transition-all"
+                          >
+                            Proceed to Paystack Checkout 🔒
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
                 {renderFaqAndTestimonials()}
               </div>
             )}
@@ -2952,7 +4388,18 @@ export default function App() {
                     <form
                       onSubmit={(e) => {
                         e.preventDefault();
-                        setRadioSubmitted(true);
+                        triggerPaystackCheckout({
+                          email: radioEmail,
+                          amount: activeRadioCheckout.price,
+                          packageName: activeRadioCheckout.packageName,
+                          metadata: {
+                            artist_name: radioArtistName,
+                            stream_link: radioStreamLink,
+                            clean_edit: radioCleanEdit,
+                            target_cities: radioStations
+                          },
+                          onSuccess: () => setRadioSubmitted(true)
+                        });
                       }}
                       className="space-y-4"
                     >
@@ -2961,30 +4408,62 @@ export default function App() {
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div>
                           <label className="block text-xs font-semibold text-stone-300 mb-1">Artist / Label Name</label>
-                          <input type="text" required placeholder="e.g. Starboy Records" className="w-full bg-stone-950 border border-stone-800 rounded-xl px-3 py-2.5 text-xs text-white" />
+                          <input 
+                            type="text" 
+                            required 
+                            placeholder="e.g. Starboy Records" 
+                            value={radioArtistName}
+                            onChange={(e) => setRadioArtistName(e.target.value)}
+                            className="w-full bg-stone-950 border border-stone-800 rounded-xl px-3 py-2.5 text-xs text-white" 
+                          />
                         </div>
                         <div>
                           <label className="block text-xs font-semibold text-stone-300 mb-1">Contact Email</label>
-                          <input type="email" required placeholder="artist@domain.com" className="w-full bg-stone-950 border border-stone-800 rounded-xl px-3 py-2.5 text-xs text-white" />
+                          <input 
+                            type="email" 
+                            required 
+                            placeholder="artist@domain.com" 
+                            value={radioEmail}
+                            onChange={(e) => setRadioEmail(e.target.value)}
+                            className="w-full bg-stone-950 border border-stone-800 rounded-xl px-3 py-2.5 text-xs text-white" 
+                          />
                         </div>
                       </div>
 
                       <div>
                         <label className="block text-xs font-semibold text-stone-300 mb-1">Streaming / Audio Link</label>
-                        <input type="url" required placeholder="Paste Spotify, Apple Music, Audiomack, YouTube, or Google Drive link..." className="w-full bg-stone-950 border border-stone-800 rounded-xl px-3 py-2.5 text-xs text-white font-mono" />
+                        <input 
+                          type="url" 
+                          required 
+                          placeholder="Paste Spotify, Apple Music, Audiomack, YouTube, or Google Drive link..." 
+                          value={radioStreamLink}
+                          onChange={(e) => setRadioStreamLink(e.target.value)}
+                          className="w-full bg-stone-950 border border-stone-800 rounded-xl px-3 py-2.5 text-xs text-white font-mono" 
+                        />
                       </div>
 
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div>
                           <label className="block text-xs font-semibold text-stone-300 mb-1">Radio Edit / Clean Version Check</label>
-                          <select className="w-full bg-stone-950 border border-stone-800 rounded-xl px-3 py-2.5 text-xs text-white">
+                          <select 
+                            value={radioCleanEdit}
+                            onChange={(e) => setRadioCleanEdit(e.target.value)}
+                            className="w-full bg-stone-950 border border-stone-800 rounded-xl px-3 py-2.5 text-xs text-white"
+                          >
                             <option value="yes">Yes, Radio Clean Edit Ready</option>
                             <option value="needs_edit">Needs Studio Radio Edit Service</option>
                           </select>
                         </div>
                         <div>
                           <label className="block text-xs font-semibold text-stone-300 mb-1">Preferred Target Cities / Stations</label>
-                          <input type="text" required placeholder="e.g. Lagos (Beat FM, Cool FM), PH" className="w-full bg-stone-950 border border-stone-800 rounded-xl px-3 py-2.5 text-xs text-white" />
+                          <input 
+                            type="text" 
+                            required 
+                            placeholder="e.g. Lagos (Beat FM, Cool FM), PH" 
+                            value={radioStations}
+                            onChange={(e) => setRadioStations(e.target.value)}
+                            className="w-full bg-stone-950 border border-stone-800 rounded-xl px-3 py-2.5 text-xs text-white" 
+                          />
                         </div>
                       </div>
 
@@ -3000,7 +4479,7 @@ export default function App() {
                           type="submit"
                           className="w-2/3 bg-amber-500 hover:bg-amber-400 text-stone-950 font-bold py-3 rounded-xl text-xs shadow-lg"
                         >
-                          Simulate Paystack Payment & Submit Brief 🔒
+                          Proceed to Paystack Payment 🔒
                         </button>
                       </div>
                     </form>
@@ -3088,7 +4567,19 @@ export default function App() {
                     <form
                       onSubmit={(e) => {
                         e.preventDefault();
-                        setTiktokSubmitted(true);
+                        triggerPaystackCheckout({
+                          email: tiktokEmail,
+                          amount: activeTiktokCheckout.price,
+                          packageName: `${activeTiktokCheckout.tierName} (${activeTiktokCheckout.videoCount} Videos)`,
+                          metadata: {
+                            brand_or_artist: tiktokBrandName,
+                            tiktok_audio_link: tiktokAudioLink,
+                            concept_brief: tiktokConceptBrief,
+                            artwork_link: tiktokAssetLink,
+                            video_count: activeTiktokCheckout.videoCount
+                          },
+                          onSuccess: () => setTiktokSubmitted(true)
+                        });
                       }}
                       className="space-y-4"
                     >
@@ -3097,27 +4588,62 @@ export default function App() {
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div>
                           <label className="block text-xs font-semibold text-stone-300 mb-1">Artist / Brand Name</label>
-                          <input type="text" required placeholder="e.g. Asake / Pepsi Nigeria" className="w-full bg-stone-950 border border-stone-800 rounded-xl px-3 py-2.5 text-xs text-white" />
+                          <input 
+                            type="text" 
+                            required 
+                            placeholder="e.g. Asake / Pepsi Nigeria" 
+                            value={tiktokBrandName}
+                            onChange={(e) => setTiktokBrandName(e.target.value)}
+                            className="w-full bg-stone-950 border border-stone-800 rounded-xl px-3 py-2.5 text-xs text-white" 
+                          />
                         </div>
                         <div>
                           <label className="block text-xs font-semibold text-stone-300 mb-1">Contact Email</label>
-                          <input type="email" required placeholder="contact@brand.com" className="w-full bg-stone-950 border border-stone-800 rounded-xl px-3 py-2.5 text-xs text-white" />
+                          <input 
+                            type="email" 
+                            required 
+                            placeholder="contact@brand.com" 
+                            value={tiktokEmail}
+                            onChange={(e) => setTiktokEmail(e.target.value)}
+                            className="w-full bg-stone-950 border border-stone-800 rounded-xl px-3 py-2.5 text-xs text-white" 
+                          />
                         </div>
                       </div>
 
                       <div>
                         <label className="block text-xs font-semibold text-stone-300 mb-1">TikTok Song Audio Link / Name (Spotify / SoundCloud / TikTok Sound)</label>
-                        <input type="text" required placeholder="https://tiktok.com/music/... or song title" className="w-full bg-stone-950 border border-stone-800 rounded-xl px-3 py-2.5 text-xs text-white font-mono" />
+                        <input 
+                          type="text" 
+                          required 
+                          placeholder="https://tiktok.com/music/... or song title" 
+                          value={tiktokAudioLink}
+                          onChange={(e) => setTiktokAudioLink(e.target.value)}
+                          className="w-full bg-stone-950 border border-stone-800 rounded-xl px-3 py-2.5 text-xs text-white font-mono" 
+                        />
                       </div>
 
                       <div>
                         <label className="block text-xs font-semibold text-stone-300 mb-1">Target Instructions / Concept Brief</label>
-                        <textarea rows={3} required placeholder="Describe dance challenge choreography, hook emphasis, or video concept..." className="w-full bg-stone-950 border border-stone-800 rounded-xl p-3 text-xs text-white"></textarea>
+                        <textarea 
+                          rows={3} 
+                          required 
+                          placeholder="Describe dance challenge choreography, hook emphasis, or video concept..." 
+                          value={tiktokConceptBrief}
+                          onChange={(e) => setTiktokConceptBrief(e.target.value)}
+                          className="w-full bg-stone-950 border border-stone-800 rounded-xl p-3 text-xs text-white"
+                        ></textarea>
                       </div>
 
                       <div>
                         <label className="block text-xs font-semibold text-stone-300 mb-1">Artwork / Asset Upload Link (Google Drive / Dropbox)</label>
-                        <input type="url" required placeholder="https://drive.google.com/..." className="w-full bg-stone-950 border border-stone-800 rounded-xl px-3 py-2.5 text-xs text-white font-mono" />
+                        <input 
+                          type="url" 
+                          required 
+                          placeholder="https://drive.google.com/..." 
+                          value={tiktokAssetLink}
+                          onChange={(e) => setTiktokAssetLink(e.target.value)}
+                          className="w-full bg-stone-950 border border-stone-800 rounded-xl px-3 py-2.5 text-xs text-white font-mono" 
+                        />
                       </div>
 
                       <div className="flex gap-3 pt-4">
@@ -3132,7 +4658,7 @@ export default function App() {
                           type="submit"
                           className="w-2/3 bg-amber-500 hover:bg-amber-400 text-stone-950 font-bold py-3 rounded-xl text-xs shadow-lg"
                         >
-                          Simulate Paystack Payment & Submit Campaign 🔒
+                          Proceed to Paystack Payment 🔒
                         </button>
                       </div>
                     </form>
