@@ -574,172 +574,90 @@ export default function App() {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   }, [currentRoute]);
 
-  // Dynamically fetch beats from Supabase 'music' table where track_type = 'beat'
+  // Initialize posts and beats empty and fetch exclusively from Supabase
+  const [posts, setPosts] = useState<PostItem[]>([]);
+  const [beats, setBeats] = useState<BeatItem[]>([]);
+  const [featuredTrackId, setFeaturedTrackId] = useState<string>('');
+  const [editingRecord, setEditingRecord] = useState<{ tableSource: 'music' | 'videos'; id: string | number } | null>(null);
+
   useEffect(() => {
-    const fetchBeatsFromSupabase = async () => {
+    const fetchAllSupabaseContent = async () => {
       try {
-        const { data, error } = await supabase
-          .from('music')
-          .select('*')
-          .eq('track_type', 'beat')
-          .order('id', { ascending: false });
+        const [musicRes, videoRes] = await Promise.allSettled([
+          fetchSupabaseMusic(),
+          fetchSupabaseVideos()
+        ]);
 
-        if (data && data.length > 0 && !error) {
-          const mappedBeats: BeatItem[] = data.map((item: any) => ({
-            id: item.id?.toString() || ('supa-' + Math.random()),
-            title: item.title || 'Untitled Beat',
-            producer: item.artist || 'AfroPulse Producer',
-            bpm: item.bpm || 115,
-            key: item.key || 'Am',
-            genre: item.genre || 'Afrobeat',
-            cover: item.cover_url || 'https://images.unsplash.com/photo-1598488035139-bdbb2231ce04?auto=format&fit=crop&w=800&q=80',
-            previewUrl: item.audio_url || 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-3.mp3',
-            prices: {
-              mp3: item.price_mp3 || 35000,
-              wav: item.price_wav || 70000,
-              stems: item.price_stems || 140000,
-              exclusive: item.price_exclusive || 350000
+        const fetchedPosts: PostItem[] = [];
+        const fetchedBeats: BeatItem[] = [];
+
+        if (musicRes.status === 'fulfilled' && Array.isArray(musicRes.value)) {
+          musicRes.value.forEach((m: any) => {
+            if (m.track_type === 'beat') {
+              fetchedBeats.push({
+                id: m.id.toString(),
+                title: m.title || 'Untitled Beat',
+                producer: m.artist || 'AfroPulse Producer',
+                bpm: m.bpm || 115,
+                key: m.key || 'Am',
+                genre: m.genre || 'Afrobeat',
+                cover: m.cover_url || 'https://images.unsplash.com/photo-1598488035139-bdbb2231ce04?auto=format&fit=crop&w=800&q=80',
+                previewUrl: m.audio_url || 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-3.mp3',
+                prices: {
+                  mp3: m.price_mp3 || 35000,
+                  wav: m.price_wav || 70000,
+                  stems: m.price_stems || 140000,
+                  exclusive: m.price_exclusive || 350000
+                }
+              });
+            } else {
+              fetchedPosts.push({
+                id: m.id.toString(),
+                title: m.title || 'Untitled Track',
+                subtitle: m.artist || 'AfroPulse Artist',
+                category: m.genre?.toLowerCase().includes('amapiano') ? 'AMAPIANO' : 'MUSIC',
+                cover: m.cover_url || 'https://images.unsplash.com/photo-1514525253161-7a46d19cd819?auto=format&fit=crop&w=800&q=80',
+                date: m.created_at ? new Date(m.created_at).toLocaleDateString() : 'Just now',
+                duration: '03:30',
+                downloads: '1.2K',
+                body: m.description || 'Exclusive release on AfroPulse.',
+                audioUrl: m.audio_url || '',
+                isHero: m.is_hero || false
+              });
             }
-          }));
-
-          setBeats(prev => {
-            const existingTitles = new Set(prev.map(b => b.title));
-            const freshItems = mappedBeats.filter(b => !existingTitles.has(b.title));
-            return [...freshItems, ...prev];
           });
         }
+
+        if (videoRes.status === 'fulfilled' && Array.isArray(videoRes.value)) {
+          videoRes.value.forEach((v: any) => {
+            fetchedPosts.push({
+              id: `v-${v.id}`,
+              title: v.title || 'Untitled Video',
+              subtitle: v.artist || 'AfroPulse Video',
+              category: v.category === 'movie_premiere' ? 'MOVIES' : (v.category === 'news' ? 'NEWS' : 'VIDEOS'),
+              cover: v.thumbnail_url || 'https://images.unsplash.com/photo-1574717024653-61fd2cf4d44d?auto=format&fit=crop&w=800&q=80',
+              date: v.created_at ? new Date(v.created_at).toLocaleDateString() : 'Just now',
+              duration: '03:45',
+              views: '45K views',
+              body: v.description || 'Official video premiere on AfroPulse.',
+              videoUrl: v.youtube_url || v.video_url || '',
+              audioUrl: v.video_url || ''
+            });
+          });
+        }
+
+        setPosts(fetchedPosts);
+        setBeats(fetchedBeats);
+        if (fetchedPosts.length > 0) {
+          setFeaturedTrackId(fetchedPosts[0].id);
+        }
       } catch (err) {
-        console.warn('Dynamic beats fetch notice:', err);
+        console.warn('Error fetching Supabase content:', err);
       }
     };
 
-    fetchBeatsFromSupabase();
+    fetchAllSupabaseContent();
   }, []);
-
-  // Dynamic Posts State
-  const [posts, setPosts] = useState<PostItem[]>([
-    {
-      id: '1',
-      title: 'Buga Dance (Remix)',
-      subtitle: 'Kwamz ft. Tiwa Savage & Sarz',
-      category: 'MUSIC',
-      cover: 'https://images.unsplash.com/photo-1514525253161-7a46d19cd819?auto=format&fit=crop&w=800&q=80',
-      date: '2 hours ago',
-      duration: '03:45',
-      downloads: '142.5K',
-      body: 'Kwamz teams up with the Queen of Afrobeats Tiwa Savage and legendary super-producer Sarz for an irresistible dancefloor anthem combining hypnotic log drums with seductive melodies.',
-      lyrics: [
-        '[Intro: Tiwa Savage & Kwamz]',
-        'Omo Ologo ni mi o',
-        'Sarz on the beat again oo',
-        'When the drum sound heavy, make you scatter the floor...',
-        '[Chorus]',
-        'Buga for the money, dance for the grace',
-        'Afropulse rhythm taking over the place!'
-      ],
-      audioUrl: 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3',
-      isHero: true,
-      socials: {
-        spotify: 'https://spotify.com/track/sample1',
-        tiktok: '@kwamzofficial',
-        instagram: '@kwamzmusic',
-        twitter: '@kwamz',
-        youtube: 'https://youtube.com/watch?v=sample1'
-      }
-    },
-    {
-      id: '2',
-      title: 'Golden Rhythms (Amapiano Master)',
-      subtitle: 'The Afrovibe Collective & Kabza Keys',
-      category: 'AMAPIANO',
-      cover: 'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?auto=format&fit=crop&w=800&q=80',
-      date: '3 hours ago',
-      duration: '04:12',
-      downloads: '98.4K',
-      body: 'An immersive journey through deep log drums and soaring piano chords straight from the underground clubs of Johannesburg and Lagos.',
-      audioUrl: 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-2.mp3',
-      socials: {
-        spotify: 'https://spotify.com/track/sample2',
-        instagram: '@kabzakeys'
-      }
-    },
-    {
-      id: '3',
-      title: 'Lagos Nights (Official 4K Video)',
-      subtitle: 'Lumina ft. Burna Boy (Dir. TG Omori)',
-      category: 'VIDEOS',
-      cover: 'https://images.unsplash.com/photo-1574717024653-61fd2cf4d44d?auto=format&fit=crop&w=800&q=80',
-      date: '5 hours ago',
-      duration: '03:42',
-      views: '2.8M views',
-      body: 'Cinematic visual masterpiece capturing the vibrant neon-lit nightlife of Lagos island.',
-      videoUrl: 'https://www.youtube.com/embed/dQw4w9WgXcQ',
-      socials: {
-        youtube: 'https://youtube.com/watch?v=lagosnights'
-      }
-    },
-    {
-      id: '4',
-      title: 'African Music Awards 2026: Historic Winners',
-      subtitle: 'Burna Boy, Tyla, and Rema Dominate Dallas',
-      category: 'NEWS',
-      cover: 'https://images.unsplash.com/photo-1492684223066-81342ee5ff30?auto=format&fit=crop&w=800&q=80',
-      date: '6 hours ago',
-      reads: '45.2K reads',
-      readTime: '4 min read',
-      body: 'The 2026 African Muzik Magazine Awards concluded in Dallas with historic triumphs for Afrobeats and Amapiano pioneers.'
-    }
-  ]);
-
-  const [featuredTrackId, setFeaturedTrackId] = useState<string>('1');
-
-  // Beat Store State
-  const [beats, setBeats] = useState<BeatItem[]>([
-    {
-      id: 'b1',
-      title: 'Lagos Sunset (Afrobeat Instrumental)',
-      producer: 'HD Sounz / AfroPulse',
-      bpm: 112,
-      key: 'Am',
-      genre: 'Afrobeat',
-      cover: 'https://images.unsplash.com/photo-1598488035139-bdbb2231ce04?auto=format&fit=crop&w=800&q=80',
-      previewUrl: 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-3.mp3',
-      prices: { mp3: 35000, wav: 70000, stems: 140000, exclusive: 350000 }
-    },
-    {
-      id: 'b2',
-      title: 'Sandton Groove (Amapiano Beat)',
-      producer: 'Kabza Keys',
-      bpm: 115,
-      key: 'F#m',
-      genre: 'Amapiano',
-      cover: 'https://images.unsplash.com/photo-1508700115892-45ecd05ae2ad?auto=format&fit=crop&w=800&q=80',
-      previewUrl: 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-4.mp3',
-      prices: { mp3: 35000, wav: 70000, stems: 140000, exclusive: 350000 }
-    },
-    {
-      id: 'b3',
-      title: 'Calabar Highlife & Afro-Fusion',
-      producer: 'Masterkraft Vibes',
-      bpm: 108,
-      key: 'C#m',
-      genre: 'Afro-Fusion',
-      cover: 'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?auto=format&fit=crop&w=800&q=80',
-      previewUrl: 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-5.mp3',
-      prices: { mp3: 35000, wav: 70000, stems: 140000, exclusive: 350000 }
-    },
-    {
-      id: 'b4',
-      title: 'Burna Wave (Odugwu Riddim)',
-      producer: 'Sarz Magic',
-      bpm: 105,
-      key: 'Em',
-      genre: 'Afrobeat',
-      cover: 'https://images.unsplash.com/photo-1470225620780-dba8ba36b745?auto=format&fit=crop&w=800&q=80',
-      previewUrl: 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-6.mp3',
-      prices: { mp3: 35000, wav: 70000, stems: 140000, exclusive: 350000 }
-    }
-  ]);
 
   // Universal Pricing Matrix State with Full CRUD Editing
   const [prTiers, setPrTiers] = useState([
@@ -794,15 +712,28 @@ export default function App() {
     }
   };
 
-  const handleDownloadFile = (item: any) => {
-    const url = item.downloadUrl || 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-3.mp3';
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `${(item.title || 'afropulse_beat').replace(/[^a-z0-9]/gi, '_')}_${item.licenseType || 'license'}.mp3`;
-    a.target = '_blank';
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
+  const handleDownloadFile = async (item: any) => {
+    const url = item.audioUrl || item.mediaUrl || item.previewUrl || item.audio_url || 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-3.mp3';
+    try {
+      const response = await fetch(url);
+      const blob = await response.blob();
+      const blobUrl = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = blobUrl;
+      a.download = `${(item.title || 'afropulse_track').replace(/[^a-z0-9]/gi, '_')}.mp3`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      window.URL.revokeObjectURL(blobUrl);
+    } catch (e) {
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `${(item.title || 'afropulse_track').replace(/[^a-z0-9]/gi, '_')}.mp3`;
+      a.target = '_blank';
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+    }
   };
 
   // Ad Manager State with Direct File Uploads
@@ -1245,12 +1176,62 @@ export default function App() {
     }
   };
 
-  const handlePublishPost = (e: React.FormEvent) => {
+  const handlePublishPost = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!uform.title) {
       alert('Please enter a title');
       return;
     }
+
+    if (editingRecord) {
+      try {
+        let finalCover = uform.coverPreview;
+        let finalAudio = uform.audioFile ? URL.createObjectURL(uform.audioFile) : '';
+        if (uform.coverFile) {
+          finalCover = await uploadStorageAsset('cover_art', uform.coverFile).catch(() => uform.coverPreview);
+        }
+        if (uform.audioFile) {
+          finalAudio = await uploadStorageAsset('music_files', uform.audioFile).catch(() => '');
+        }
+
+        await updateSupabaseRecord(editingRecord.tableSource, editingRecord.id, {
+          title: uform.title,
+          artist: uform.subtitle || 'AfroPulse Artist',
+          genre: uform.category === 'AMAPIANO' ? 'Amapiano' : 'Afrobeats',
+          description: uform.body,
+          cover_url: finalCover,
+          audio_url: finalAudio || undefined,
+          youtube_url: uform.youtubeUrl || undefined
+        });
+
+        alert('Post updated successfully in Supabase!');
+        setEditingRecord(null);
+        setUform({
+          title: '',
+          subtitle: '',
+          category: 'MUSIC',
+          coverFile: null,
+          coverPreview: '',
+          audioFile: null,
+          videoFile: null,
+          youtubeUrl: '',
+          body: '',
+          lyrics: '',
+          spotify: '',
+          tiktok: '',
+          instagram: '',
+          twitter: '',
+          youtubeChannel: '',
+          isHero: false
+        });
+        await refreshAdminContent();
+        return;
+      } catch (err) {
+        console.error('Update error:', err);
+        alert('Error updating record in Supabase.');
+      }
+    }
+
     const newPost: PostItem = {
       id: Date.now().toString(),
       title: uform.title,
@@ -1322,6 +1303,7 @@ export default function App() {
       youtubeChannel: '',
       isHero: false
     });
+    await refreshAdminContent();
   };
 
   const handlePublishBeat = (e: React.FormEvent) => {
@@ -1380,7 +1362,20 @@ export default function App() {
     });
   };
 
-  const flagshipTrack = posts.find(p => p.id === featuredTrackId) || posts[0];
+  const fallbackTrack: PostItem = {
+    id: 'default-1',
+    title: 'AfroPulse Featured Hit',
+    subtitle: 'Latest Release',
+    category: 'MUSIC',
+    cover: 'https://images.unsplash.com/photo-1514525253161-7a46d19cd819?auto=format&fit=crop&w=800&q=80',
+    date: 'Today',
+    duration: '03:30',
+    downloads: '1.2K',
+    body: 'Discover the latest hits on AfroPulse.',
+    audioUrl: 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-3.mp3'
+  };
+
+  const flagshipTrack = posts.find(p => p.id === featuredTrackId) || posts[0] || fallbackTrack;
 
   return (
     <main className="w-full min-h-screen bg-[#0d0d0d] text-white overflow-x-hidden flex flex-col font-sans">
@@ -3760,7 +3755,7 @@ export default function App() {
 
             {/* ROUTE: INNER POST DETAIL PAGE (/post/:id) */}
             {currentRoute === 'post' && selectedPostId && (() => {
-              const post = posts.find(p => p.id === selectedPostId) || posts[0];
+              const post = posts.find(p => p.id === selectedPostId) || posts[0] || fallbackTrack;
               const relatedPosts = posts.filter(p => p.category === post.category && p.id !== post.id).slice(0, 5);
               const comments = postComments[post.id] || [
                 { id: 'c1', author: 'Oluwaseun T.', text: 'Amazing drop! The production quality on this is top-notch.', date: '2 hours ago' },
