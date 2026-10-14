@@ -1362,20 +1362,7 @@ export default function App() {
     });
   };
 
-  const fallbackTrack: PostItem = {
-    id: 'default-1',
-    title: 'AfroPulse Featured Hit',
-    subtitle: 'Latest Release',
-    category: 'MUSIC',
-    cover: 'https://images.unsplash.com/photo-1514525253161-7a46d19cd819?auto=format&fit=crop&w=800&q=80',
-    date: 'Today',
-    duration: '03:30',
-    downloads: '1.2K',
-    body: 'Discover the latest hits on AfroPulse.',
-    audioUrl: 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-3.mp3'
-  };
-
-  const flagshipTrack = posts.find(p => p.id === featuredTrackId) || posts[0] || fallbackTrack;
+  const flagshipTrack = posts.find(p => p.id === featuredTrackId) || posts[0];
 
   return (
     <main className="w-full min-h-screen bg-[#0d0d0d] text-white overflow-x-hidden flex flex-col font-sans">
@@ -2604,54 +2591,62 @@ export default function App() {
               <div className="space-y-10">
                 
                 {/* 3. FEATURED #1 SONG (HERO BANNER) */}
-                <div className="bg-gradient-to-r from-stone-900 via-stone-900 to-amber-950/40 border border-stone-800 rounded-2xl p-6 md:p-8 flex flex-col md:flex-row items-center gap-6 shadow-2xl relative overflow-hidden">
-                  <div className="absolute top-0 right-0 w-96 h-96 bg-amber-500/5 rounded-full blur-3xl pointer-events-none"></div>
-                  <div 
-                    onClick={() => { setSelectedPostId(flagshipTrack.id); setCurrentRoute('post'); }}
-                    className="w-32 h-32 md:w-44 md:h-44 shrink-0 rounded-xl overflow-hidden relative shadow-xl border border-stone-700 cursor-pointer group"
-                  >
-                    <img src={flagshipTrack.cover} alt="" className="w-full h-full object-cover group-hover:scale-105 transition-transform" />
-                    <div className="absolute inset-0 bg-black/20 flex items-center justify-center">
-                      <button
-                        onClick={(e) => { e.stopPropagation(); handlePlayTrack(flagshipTrack); }}
-                        className="w-12 h-12 rounded-full bg-amber-500 hover:bg-amber-400 text-stone-950 flex items-center justify-center shadow-lg transition-transform hover:scale-110"
-                      >
-                        {isPlaying && currentPlayingTrack?.id === flagshipTrack.id ? <Pause className="w-6 h-6 fill-stone-950" /> : <Play className="w-6 h-6 fill-stone-950 ml-0.5" />}
-                      </button>
-                    </div>
-                  </div>
-                  <div className="flex-1 space-y-3 text-center md:text-left">
-                    <div className="flex items-center justify-center md:justify-start gap-2">
-                      <span className="px-3 py-1 rounded-full text-[10px] font-extrabold bg-amber-500 text-stone-950 uppercase tracking-widest flex items-center gap-1">
-                        <Flame className="w-3 h-3 fill-stone-950" /> #1 Featured Trending Song
-                      </span>
-                      <span className="text-xs text-stone-400">{flagshipTrack.date}</span>
-                    </div>
-                    <h2 
+                {flagshipTrack ? (
+                  <div className="bg-gradient-to-r from-stone-900 via-stone-900 to-amber-950/40 border border-stone-800 rounded-2xl p-6 md:p-8 flex flex-col md:flex-row items-center gap-6 shadow-2xl relative overflow-hidden">
+                    <div className="absolute top-0 right-0 w-96 h-96 bg-amber-500/5 rounded-full blur-3xl pointer-events-none"></div>
+                    <div 
                       onClick={() => { setSelectedPostId(flagshipTrack.id); setCurrentRoute('post'); }}
-                      className="text-2xl md:text-3xl font-black text-white tracking-tight cursor-pointer hover:text-amber-400 transition"
+                      className="w-32 h-32 md:w-44 md:h-44 shrink-0 rounded-xl overflow-hidden relative shadow-xl border border-stone-700 cursor-pointer group"
                     >
-                      {flagshipTrack.title}
-                    </h2>
-                    <p className="text-sm font-semibold text-amber-400">{flagshipTrack.subtitle}</p>
-                    <p className="text-xs text-stone-300 line-clamp-2 max-w-2xl">{flagshipTrack.body}</p>
-                    <div className="flex flex-wrap items-center justify-center md:justify-start gap-3 pt-2">
-                      <button
-                        onClick={() => handlePlayTrack(flagshipTrack)}
-                        className="bg-amber-500 hover:bg-amber-400 text-stone-950 font-bold px-6 py-2.5 rounded-xl text-xs flex items-center gap-2 shadow-lg transition-all"
-                      >
-                        {isPlaying && currentPlayingTrack?.id === flagshipTrack.id ? <Pause className="w-4 h-4 fill-stone-950" /> : <Play className="w-4 h-4 fill-stone-950" />}
-                        Stream / Play Audio
-                      </button>
-                      <button
+                      <img src={flagshipTrack.cover} alt="" className="w-full h-full object-cover group-hover:scale-105 transition-transform" />
+                      <div className="absolute inset-0 bg-black/20 flex items-center justify-center">
+                        <button
+                          onClick={(e) => { e.stopPropagation(); handlePlayTrack(flagshipTrack); }}
+                          className="w-12 h-12 rounded-full bg-amber-500 hover:bg-amber-400 text-stone-950 flex items-center justify-center shadow-lg transition-transform hover:scale-110"
+                        >
+                          {isPlaying && currentPlayingTrack?.id === flagshipTrack.id ? <Pause className="w-6 h-6 fill-stone-950" /> : <Play className="w-6 h-6 fill-stone-950 ml-0.5" />}
+                        </button>
+                      </div>
+                    </div>
+                    <div className="flex-1 space-y-3 text-center md:text-left">
+                      <div className="flex items-center justify-center md:justify-start gap-2">
+                        <span className="px-3 py-1 rounded-full text-[10px] font-extrabold bg-amber-500 text-stone-950 uppercase tracking-widest flex items-center gap-1">
+                          <Flame className="w-3 h-3 fill-stone-950" /> #1 Featured Trending Song
+                        </span>
+                        <span className="text-xs text-stone-400">{flagshipTrack.date}</span>
+                      </div>
+                      <h2 
                         onClick={() => { setSelectedPostId(flagshipTrack.id); setCurrentRoute('post'); }}
-                        className="bg-stone-800 hover:bg-stone-700 text-stone-200 font-semibold px-5 py-2.5 rounded-xl text-xs flex items-center gap-2 transition-all border border-stone-700"
+                        className="text-2xl md:text-3xl font-black text-white tracking-tight cursor-pointer hover:text-amber-400 transition"
                       >
-                        <FileText className="w-4 h-4 text-amber-400" /> View Post / Read Story
-                      </button>
+                        {flagshipTrack.title}
+                      </h2>
+                      <p className="text-sm font-semibold text-amber-400">{flagshipTrack.subtitle}</p>
+                      <p className="text-xs text-stone-300 line-clamp-2 max-w-2xl">{flagshipTrack.body}</p>
+                      <div className="flex flex-wrap items-center justify-center md:justify-start gap-3 pt-2">
+                        <button
+                          onClick={() => handlePlayTrack(flagshipTrack)}
+                          className="bg-amber-500 hover:bg-amber-400 text-stone-950 font-bold px-6 py-2.5 rounded-xl text-xs flex items-center gap-2 shadow-lg transition-all"
+                        >
+                          {isPlaying && currentPlayingTrack?.id === flagshipTrack.id ? <Pause className="w-4 h-4 fill-stone-950" /> : <Play className="w-4 h-4 fill-stone-950" />}
+                          Stream / Play Audio
+                        </button>
+                        <button
+                          onClick={() => { setSelectedPostId(flagshipTrack.id); setCurrentRoute('post'); }}
+                          className="bg-stone-800 hover:bg-stone-700 text-stone-200 font-semibold px-5 py-2.5 rounded-xl text-xs flex items-center gap-2 transition-all border border-stone-700"
+                        >
+                          <FileText className="w-4 h-4 text-amber-400" /> View Post / Read Story
+                        </button>
+                      </div>
                     </div>
                   </div>
-                </div>
+                ) : (
+                  <div className="bg-stone-900/90 border border-stone-800 rounded-2xl p-8 text-center space-y-3">
+                    <Flame className="w-8 h-8 text-amber-400 mx-auto animate-pulse" />
+                    <h3 className="text-lg font-bold text-white">No featured track published yet</h3>
+                    <p className="text-xs text-stone-400 max-w-md mx-auto">Publish music tracks or videos via the Admin Dashboard to feature your #1 trending hit here automatically.</p>
+                  </div>
+                )}
 
                 {/* 6. PROMOTION BANNER CTA ("Promote Your Music On AfroPulse") */}
                 <div className="bg-gradient-to-r from-emerald-950/60 via-stone-900 to-stone-900 border border-emerald-500/30 rounded-2xl p-6 flex flex-col md:flex-row items-center justify-between gap-6 shadow-xl">
