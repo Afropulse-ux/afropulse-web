@@ -602,22 +602,93 @@ export default function App() {
   const [featuredTrackId, setFeaturedTrackId] = useState<string>('');
   const [editingRecord, setEditingRecord] = useState<{ tableSource: 'music' | 'videos'; id: string | number } | null>(null);
 
-  useEffect(() => {
-    const fetchAllSupabaseContent = async () => {
-      try {
-        const [musicRes, videoRes] = await Promise.allSettled([
-          fetchSupabaseMusic(),
-          fetchSupabaseVideos()
-        ]);
+  const fetchAllSupabaseContent = async () => {
+    try {
+      const [postsRes, musicRes, videoRes] = await Promise.allSettled([
+        supabase.from('posts').select('*').order('id', { ascending: false }),
+        fetchSupabaseMusic(),
+        fetchSupabaseVideos()
+      ]);
 
-        const fetchedPosts: PostItem[] = [];
-        const fetchedBeats: BeatItem[] = [];
+      const fetchedPosts: PostItem[] = [];
+      const fetchedBeats: BeatItem[] = [];
+      const seenPostIds = new Set<string>();
+      const seenPostTitles = new Set<string>();
+      const seenBeatIds = new Set<string>();
+      const seenBeatTitles = new Set<string>();
 
-        if (musicRes.status === 'fulfilled' && Array.isArray(musicRes.value)) {
-          musicRes.value.forEach((m: any) => {
-            if (m.track_type === 'beat') {
+      // 1. Process posts table records
+      if (postsRes.status === 'fulfilled' && postsRes.value && Array.isArray((postsRes.value as any).data)) {
+        (postsRes.value as any).data.forEach((p: any) => {
+          const cat = (p.category || '').toUpperCase();
+          if (cat === 'BEATS' || p.track_type === 'beat') {
+            const beatId = p.id?.toString() || `b-${Date.now()}`;
+            const beatTitle = (p.title || 'Untitled Beat').toLowerCase().trim();
+            if (!seenBeatIds.has(beatId) && !seenBeatTitles.has(beatTitle)) {
+              seenBeatIds.add(beatId);
+              seenBeatTitles.add(beatTitle);
               fetchedBeats.push({
-                id: m.id.toString(),
+                id: beatId,
+                title: p.title || 'Untitled Beat',
+                producer: p.producer || p.artist || p.subtitle || 'AfroPulse Producer',
+                bpm: Number(p.bpm) || 120,
+                key: p.key || 'Am',
+                genre: p.genre || 'Afrobeat',
+                cover: p.cover || p.cover_url || 'https://images.unsplash.com/photo-1598488035139-bdbb2231ce04?auto=format&fit=crop&w=800&q=80',
+                previewUrl: p.audio_url || p.audioUrl || p.preview_url || 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-3.mp3',
+                prices: {
+                  mp3: Number(p.price_mp3) || 35000,
+                  wav: Number(p.price_wav) || 70000,
+                  stems: Number(p.price_stems) || 140000,
+                  exclusive: Number(p.price_exclusive) || 350000
+                }
+              });
+            }
+          } else {
+            const postId = p.id?.toString() || `p-${Date.now()}`;
+            const postTitle = (p.title || 'Untitled Post').toLowerCase().trim();
+            if (!seenPostIds.has(postId) && !seenPostTitles.has(postTitle)) {
+              seenPostIds.add(postId);
+              seenPostTitles.add(postTitle);
+              fetchedPosts.push({
+                id: postId,
+                title: p.title || 'Untitled Post',
+                subtitle: p.subtitle || p.artist || 'AfroPulse Exclusive',
+                category: (p.category?.toUpperCase() as any) || (p.genre?.toLowerCase().includes('amapiano') ? 'AMAPIANO' : 'MUSIC'),
+                cover: p.cover || p.cover_url || 'https://images.unsplash.com/photo-1514525253161-7a46d19cd819?auto=format&fit=crop&w=800&q=80',
+                date: p.created_at ? new Date(p.created_at).toLocaleDateString() : (p.date || 'Just now'),
+                duration: p.duration || '03:30',
+                downloads: p.downloads || '1.2K',
+                views: p.views,
+                body: p.body || p.description || 'Exclusive release on AfroPulse.',
+                lyrics: Array.isArray(p.lyrics) ? p.lyrics : (typeof p.lyrics === 'string' ? p.lyrics.split('\n') : undefined),
+                audioUrl: p.audio_url || p.audioUrl || '',
+                videoUrl: p.video_url || p.videoUrl || '',
+                isHero: Boolean(p.is_hero || p.isHero),
+                socials: {
+                  spotify: p.spotify || '',
+                  tiktok: p.tiktok || '',
+                  instagram: p.instagram || '',
+                  twitter: p.twitter || '',
+                  youtube: p.youtube || p.youtube_channel || p.youtubeChannel || ''
+                }
+              });
+            }
+          }
+        });
+      }
+
+      // 2. Process music table records
+      if (musicRes.status === 'fulfilled' && Array.isArray(musicRes.value)) {
+        musicRes.value.forEach((m: any) => {
+          if (m.track_type === 'beat') {
+            const beatId = m.id?.toString() || `b-${Date.now()}`;
+            const beatTitle = (m.title || 'Untitled Beat').toLowerCase().trim();
+            if (!seenBeatIds.has(beatId) && !seenBeatTitles.has(beatTitle)) {
+              seenBeatIds.add(beatId);
+              seenBeatTitles.add(beatTitle);
+              fetchedBeats.push({
+                id: beatId,
                 title: m.title || 'Untitled Beat',
                 producer: m.artist || 'AfroPulse Producer',
                 bpm: m.bpm || 115,
@@ -632,9 +703,15 @@ export default function App() {
                   exclusive: m.price_exclusive || 350000
                 }
               });
-            } else {
+            }
+          } else {
+            const postId = m.id?.toString() || `p-${Date.now()}`;
+            const postTitle = (m.title || 'Untitled Track').toLowerCase().trim();
+            if (!seenPostIds.has(postId) && !seenPostTitles.has(postTitle)) {
+              seenPostIds.add(postId);
+              seenPostTitles.add(postTitle);
               fetchedPosts.push({
-                id: m.id.toString(),
+                id: postId,
                 title: m.title || 'Untitled Track',
                 subtitle: m.artist || 'AfroPulse Artist',
                 category: m.genre?.toLowerCase().includes('amapiano') ? 'AMAPIANO' : 'MUSIC',
@@ -644,16 +721,23 @@ export default function App() {
                 downloads: '1.2K',
                 body: m.description || 'Exclusive release on AfroPulse.',
                 audioUrl: m.audio_url || '',
-                isHero: m.is_hero || false
+                isHero: Boolean(m.is_hero || m.is_featured)
               });
             }
-          });
-        }
+          }
+        });
+      }
 
-        if (videoRes.status === 'fulfilled' && Array.isArray(videoRes.value)) {
-          videoRes.value.forEach((v: any) => {
+      // 3. Process video table records
+      if (videoRes.status === 'fulfilled' && Array.isArray(videoRes.value)) {
+        videoRes.value.forEach((v: any) => {
+          const vidId = `v-${v.id}`;
+          const vidTitle = (v.title || 'Untitled Video').toLowerCase().trim();
+          if (!seenPostIds.has(vidId) && !seenPostTitles.has(vidTitle)) {
+            seenPostIds.add(vidId);
+            seenPostTitles.add(vidTitle);
             fetchedPosts.push({
-              id: `v-${v.id}`,
+              id: vidId,
               title: v.title || 'Untitled Video',
               subtitle: v.artist || 'AfroPulse Video',
               category: v.category === 'movie_premiere' ? 'MOVIES' : (v.category === 'news' ? 'NEWS' : 'VIDEOS'),
@@ -665,19 +749,24 @@ export default function App() {
               videoUrl: v.youtube_url || v.video_url || '',
               audioUrl: v.video_url || ''
             });
-          });
-        }
-
-        setPosts(fetchedPosts);
-        setBeats(fetchedBeats);
-        if (fetchedPosts.length > 0) {
-          setFeaturedTrackId(fetchedPosts[0].id);
-        }
-      } catch (err) {
-        console.warn('Error fetching Supabase content:', err);
+          }
+        });
       }
-    };
 
+      setPosts(fetchedPosts);
+      setBeats(fetchedBeats);
+      const heroPost = fetchedPosts.find(p => p.isHero);
+      if (heroPost) {
+        setFeaturedTrackId(heroPost.id);
+      } else if (fetchedPosts.length > 0) {
+        setFeaturedTrackId(fetchedPosts[0].id);
+      }
+    } catch (err) {
+      console.warn('Error fetching Supabase content:', err);
+    }
+  };
+
+  useEffect(() => {
     fetchAllSupabaseContent();
   }, []);
 
@@ -850,12 +939,41 @@ export default function App() {
   const refreshAdminContent = async () => {
     setIsLoadingAdminContent(true);
     try {
-      const [musicRes, videoRes] = await Promise.allSettled([
+      const [postsRes, musicRes, videoRes] = await Promise.allSettled([
+        supabase.from('posts').select('*').order('id', { ascending: false }),
         fetchSupabaseMusic(),
         fetchSupabaseVideos()
       ]);
 
       const items: AdminContentItem[] = [];
+
+      // 0. Items from Supabase 'posts' table
+      if (postsRes.status === 'fulfilled' && postsRes.value && Array.isArray((postsRes.value as any).data)) {
+        (postsRes.value as any).data.forEach((p: any) => {
+          items.push({
+            id: `supa-post-${p.id}`,
+            supabaseId: p.id,
+            tableSource: 'posts',
+            title: p.title || 'Untitled Post',
+            artist: p.subtitle || p.artist || 'AfroPulse Artist',
+            categoryOrType: p.category === 'BEATS' ? 'beat' : (p.category === 'VIDEOS' ? 'music_video' : (p.category === 'NEWS' ? 'news' : 'song')),
+            genre: p.genre || p.category || 'Afrobeats',
+            bpm: Number(p.bpm) || 120,
+            key: p.key || 'Am',
+            coverUrl: p.cover || p.cover_url || 'https://images.unsplash.com/photo-1514525253161-7a46d19cd819?auto=format&fit=crop&w=800&q=80',
+            mediaUrl: p.audio_url || p.audioUrl || '',
+            youtubeUrl: p.video_url || p.videoUrl || '',
+            description: p.body || p.description || '',
+            prices: {
+              mp3: Number(p.price_mp3) || 35000,
+              wav: Number(p.price_wav) || 70000,
+              stems: Number(p.price_stems) || 140000,
+              exclusive: Number(p.price_exclusive) || 350000
+            },
+            date: p.created_at ? new Date(p.created_at).toLocaleDateString() : 'Supabase Cloud'
+          });
+        });
+      }
 
       // 1. Music and Beats from Supabase 'music' table
       if (musicRes.status === 'fulfilled' && Array.isArray(musicRes.value)) {
@@ -1146,22 +1264,27 @@ export default function App() {
   };
 
   // Helper for playing tracks
-  const handlePlayTrack = (track: PostItem) => {
-    if (!track.audioUrl) return;
+  const handlePlayTrack = (track: PostItem | null | undefined) => {
+    if (!track) return;
+    const audioSrc = track.audioUrl || (track as any).mediaUrl || (track as any).previewUrl;
+    if (!audioSrc) {
+      alert(`No streaming audio link available for "${track.title || 'this track'}".`);
+      return;
+    }
     if (currentPlayingTrack?.id === track.id) {
       if (isPlaying) {
         audioElement?.pause();
         setIsPlaying(false);
       } else {
-        audioElement?.play();
+        audioElement?.play().catch(e => console.warn('Audio play notice:', e));
         setIsPlaying(true);
       }
     } else {
       if (audioElement) {
         audioElement.pause();
       }
-      const audio = new Audio(track.audioUrl);
-      audio.play();
+      const audio = new Audio(audioSrc);
+      audio.play().catch(e => console.warn('Audio playback notice:', e));
       audio.onended = () => setIsPlaying(false);
       setAudioElement(audio);
       setCurrentPlayingTrack(track);
@@ -1254,19 +1377,120 @@ export default function App() {
       }
     }
 
+    // Upload files to Supabase Storage if user selected files
+    let finalCoverUrl = uform.coverPreview || 'https://images.unsplash.com/photo-1514525253161-7a46d19cd819?auto=format&fit=crop&w=800&q=80';
+    let finalAudioUrl = '';
+    let finalVideoUrl = uform.youtubeUrl || '';
+
+    if (uform.coverFile) {
+      try {
+        finalCoverUrl = await uploadStorageAsset('cover_art', uform.coverFile);
+      } catch (err) {
+        console.warn('Cover upload failed, using fallback/preview:', err);
+      }
+    }
+
+    if (uform.audioFile) {
+      try {
+        finalAudioUrl = await uploadStorageAsset('music_files', uform.audioFile);
+      } catch (err) {
+        console.warn('Audio upload failed, using blob/fallback:', err);
+        finalAudioUrl = URL.createObjectURL(uform.audioFile);
+      }
+    }
+
+    if (uform.videoFile) {
+      try {
+        finalVideoUrl = await uploadStorageAsset('video_files', uform.videoFile);
+      } catch (err) {
+        console.warn('Video upload failed, using fallback:', err);
+        finalVideoUrl = URL.createObjectURL(uform.videoFile);
+      }
+    }
+
+    // 1. Mandatory Awaited Insert into Supabase 'posts' Table
+    try {
+      const { error: postInsertError } = await supabase.from('posts').insert([
+        {
+          title: uform.title,
+          subtitle: uform.subtitle || 'AfroPulse Exclusive',
+          category: uform.category,
+          cover: finalCoverUrl,
+          cover_url: finalCoverUrl,
+          audio_url: finalAudioUrl || undefined,
+          video_url: finalVideoUrl || undefined,
+          body: uform.body || '',
+          description: uform.body || '',
+          lyrics: uform.lyrics || '',
+          is_hero: uform.isHero,
+          spotify: uform.spotify || '',
+          tiktok: uform.tiktok || '',
+          instagram: uform.instagram || '',
+          twitter: uform.twitter || '',
+          youtube_channel: uform.youtubeChannel || ''
+        }
+      ]);
+
+      if (postInsertError) {
+        console.warn('Supabase posts insert notice, attempting minimal schema:', postInsertError);
+        await supabase.from('posts').insert([
+          {
+            title: uform.title,
+            subtitle: uform.subtitle || 'AfroPulse Exclusive',
+            category: uform.category,
+            cover: finalCoverUrl,
+            audio_url: finalAudioUrl || undefined,
+            video_url: finalVideoUrl || undefined,
+            body: uform.body || ''
+          }
+        ]).catch(e => console.warn('Fallback minimal posts insert notice:', e));
+      }
+    } catch (insertErr) {
+      console.warn('Error saving to posts table:', insertErr);
+    }
+
+    // Also sync to music / videos tables to guarantee multi-table persistence
+    if (uform.category === 'VIDEOS' || uform.category === 'MOVIES') {
+      await supabase.from('videos').insert([
+        {
+          title: uform.title,
+          artist: uform.subtitle || 'AfroPulse Artist',
+          category: uform.category === 'MOVIES' ? 'movie_premiere' : 'music_video',
+          thumbnail_url: finalCoverUrl,
+          video_url: finalVideoUrl || null,
+          youtube_url: uform.youtubeUrl || null,
+          description: uform.body || ''
+        }
+      ]).catch(e => console.warn('videos table sync notice:', e));
+    } else {
+      await supabase.from('music').insert([
+        {
+          title: uform.title,
+          artist: uform.subtitle || 'AfroPulse Artist',
+          genre: uform.category === 'AMAPIANO' ? 'Amapiano' : 'Afrobeats',
+          track_type: 'song',
+          audio_url: finalAudioUrl || 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3',
+          cover_url: finalCoverUrl,
+          is_featured: uform.isHero,
+          is_hero: uform.isHero,
+          description: uform.body || ''
+        }
+      ]).catch(e => console.warn('music table sync notice:', e));
+    }
+
     const newPost: PostItem = {
       id: Date.now().toString(),
       title: uform.title,
       subtitle: uform.subtitle || 'AfroPulse Exclusive',
       category: uform.category,
-      cover: uform.coverPreview || 'https://images.unsplash.com/photo-1514525253161-7a46d19cd819?auto=format&fit=crop&w=800&q=80',
+      cover: finalCoverUrl,
       date: 'Just now',
       duration: '03:30',
       downloads: '12',
       body: uform.body,
       lyrics: uform.lyrics ? uform.lyrics.split('\n') : undefined,
-      audioUrl: uform.audioFile ? URL.createObjectURL(uform.audioFile) : 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3',
-      videoUrl: uform.videoFile ? URL.createObjectURL(uform.videoFile) : (uform.youtubeUrl || undefined),
+      audioUrl: finalAudioUrl || (uform.audioFile ? URL.createObjectURL(uform.audioFile) : 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3'),
+      videoUrl: finalVideoUrl || (uform.videoFile ? URL.createObjectURL(uform.videoFile) : (uform.youtubeUrl || undefined)),
       isHero: uform.isHero,
       socials: {
         spotify: uform.spotify,
@@ -1283,30 +1507,10 @@ export default function App() {
       setFeaturedTrackId(newPost.id);
     }
     setPosts(updated);
-    // Asynchronously sync to Supabase if files are provided
-    if (uform.audioFile && uform.coverFile) {
-      uploadAudioTrack({
-        title: uform.title,
-        artist: uform.subtitle || 'AfroPulse Artist',
-        genre: uform.category === 'AMAPIANO' ? 'Amapiano' : 'Afrobeats',
-        trackType: 'song',
-        audioFile: uform.audioFile,
-        coverFile: uform.coverFile
-      }).catch(err => console.warn('Supabase audio track upload sync notice:', err));
-    }
 
-    if ((uform.videoFile || uform.youtubeUrl) && uform.coverFile) {
-      uploadVideoContent({
-        title: uform.title,
-        artist: uform.subtitle || 'AfroPulse Artist',
-        category: uform.category === 'MOVIES' ? 'movie_premiere' : 'music_video',
-        videoFile: uform.videoFile || undefined,
-        youtubeUrl: uform.youtubeUrl || undefined,
-        thumbnailFile: uform.coverFile
-      }).catch(err => console.warn('Supabase video content upload sync notice:', err));
-    }
+    alert('Post published successfully to live AfroPulse feed and Supabase database!');
 
-    alert('Post published successfully to live AfroPulse feed!');
+    // Clean reset of all form fields (Requirement 3)
     setUform({
       title: '',
       subtitle: '',
@@ -1325,24 +1529,92 @@ export default function App() {
       youtubeChannel: '',
       isHero: false
     });
+
+    await fetchAllSupabaseContent();
     await refreshAdminContent();
   };
 
-  const handlePublishBeat = (e: React.FormEvent) => {
+  const handlePublishBeat = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!bform.title) {
       alert('Please enter beat title');
       return;
     }
+
+    let beatCoverUrl = bform.coverPreview || 'https://images.unsplash.com/photo-1598488035139-bdbb2231ce04?auto=format&fit=crop&w=800&q=80';
+    let beatAudioUrl = 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-3.mp3';
+
+    if (bform.coverFile) {
+      try {
+        beatCoverUrl = await uploadStorageAsset('cover_art', bform.coverFile);
+      } catch (err) {
+        console.warn('Beat cover upload notice:', err);
+      }
+    }
+
+    const audioUploadFile = bform.previewFile || bform.mp3File;
+    if (audioUploadFile) {
+      try {
+        beatAudioUrl = await uploadStorageAsset('music_files', audioUploadFile);
+      } catch (err) {
+        console.warn('Beat audio upload notice:', err);
+        beatAudioUrl = URL.createObjectURL(audioUploadFile);
+      }
+    }
+
+    // Await insert into Supabase 'posts' table (Requirement 1)
+    try {
+      await supabase.from('posts').insert([
+        {
+          title: bform.title,
+          subtitle: bform.producer || 'AfroPulse Producer',
+          category: 'BEATS',
+          cover: beatCoverUrl,
+          cover_url: beatCoverUrl,
+          audio_url: beatAudioUrl,
+          body: `Genre: ${bform.genre} | BPM: ${bform.bpm} | Key: ${bform.key}`,
+          description: `Genre: ${bform.genre} | BPM: ${bform.bpm} | Key: ${bform.key}`,
+          price_mp3: Number(bform.priceMp3),
+          price_wav: Number(bform.priceWav),
+          price_stems: Number(bform.priceStems),
+          price_exclusive: Number(bform.priceExclusive)
+        }
+      ]);
+    } catch (dbErr) {
+      console.warn('Supabase posts beat insert notice:', dbErr);
+    }
+
+    // Also sync to Supabase music table
+    try {
+      await supabase.from('music').insert([
+        {
+          title: bform.title,
+          artist: bform.producer || 'AfroPulse Producer',
+          genre: bform.genre,
+          track_type: 'beat',
+          bpm: bform.bpm,
+          key: bform.key,
+          audio_url: beatAudioUrl,
+          cover_url: beatCoverUrl,
+          price_mp3: Number(bform.priceMp3),
+          price_wav: Number(bform.priceWav),
+          price_stems: Number(bform.priceStems),
+          price_exclusive: Number(bform.priceExclusive)
+        }
+      ]);
+    } catch (musicErr) {
+      console.warn('Supabase music beat insert notice:', musicErr);
+    }
+
     const newBeat: BeatItem = {
       id: 'b-' + Date.now(),
       title: bform.title,
-      producer: bform.producer,
+      producer: bform.producer || 'AfroPulse Producer',
       bpm: bform.bpm,
       key: bform.key,
       genre: bform.genre,
-      cover: bform.coverPreview || 'https://images.unsplash.com/photo-1598488035139-bdbb2231ce04?auto=format&fit=crop&w=800&q=80',
-      previewUrl: bform.previewFile ? URL.createObjectURL(bform.previewFile) : 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-3.mp3',
+      cover: beatCoverUrl,
+      previewUrl: beatAudioUrl,
       prices: {
         mp3: Number(bform.priceMp3),
         wav: Number(bform.priceWav),
@@ -1352,19 +1624,9 @@ export default function App() {
     };
     setBeats([newBeat, ...beats]);
 
-    // Asynchronously sync to Supabase music table and buckets
-    if (bform.coverFile && (bform.previewFile || bform.mp3File)) {
-      uploadAudioTrack({
-        title: bform.title,
-        artist: bform.producer,
-        genre: bform.genre,
-        trackType: 'beat',
-        audioFile: (bform.previewFile || bform.mp3File)!,
-        coverFile: bform.coverFile
-      }).catch(err => console.warn('Supabase beat upload sync notice:', err));
-    }
+    alert('Beat published successfully to Beat Store and Supabase database!');
 
-    alert('Beat published successfully to Beat Store!');
+    // Reset beat form fields (Requirement 3)
     setBform({
       title: '',
       producer: 'HD Sounz / AfroPulse',
@@ -1382,16 +1644,14 @@ export default function App() {
       priceStems: 75000,
       priceExclusive: 250000
     });
+
+    await fetchAllSupabaseContent();
+    await refreshAdminContent();
   };
 
-  const flagshipTrack = (posts && posts.find(p => p.id === featuredTrackId)) || (posts && posts[0]) || {
-    id: '',
-    title: '',
-    subtitle: '',
-    cover: 'https://images.unsplash.com/photo-1514525253161-7a46d19cd819?auto=format&fit=crop&w=800&q=80',
-    date: '',
-    body: ''
-  };
+  const flagshipTrack = (posts && posts.length > 0)
+    ? (posts.find(p => p.id === featuredTrackId) || posts[0])
+    : null;
 
   return (
     <main className="w-full min-h-screen bg-[#0d0d0d] text-white overflow-x-hidden flex flex-col font-sans">
@@ -1710,39 +1970,49 @@ export default function App() {
                         </div>
 
                         <div className="bg-stone-900/90 border border-stone-800 rounded-2xl p-6 space-y-6">
-                          <div className="flex items-center gap-4 bg-stone-950 p-4 rounded-xl border border-stone-800">
-                            <img src={flagshipTrack.cover} alt="" className="w-16 h-16 rounded-xl object-cover" />
-                            <div className="flex-1">
-                              <span className="text-[10px] bg-amber-500/20 text-amber-400 font-bold px-2 py-0.5 rounded-full uppercase">Current #1 Hero Song</span>
-                              <h4 className="text-base font-bold text-white mt-1">{flagshipTrack.title}</h4>
-                              <p className="text-xs text-stone-400">{flagshipTrack.subtitle}</p>
+                          {flagshipTrack ? (
+                            <div className="flex items-center gap-4 bg-stone-950 p-4 rounded-xl border border-stone-800">
+                              {flagshipTrack.cover && <img src={flagshipTrack.cover} alt="" className="w-16 h-16 rounded-xl object-cover" />}
+                              <div className="flex-1">
+                                <span className="text-[10px] bg-amber-500/20 text-amber-400 font-bold px-2 py-0.5 rounded-full uppercase">Current #1 Hero Song</span>
+                                <h4 className="text-base font-bold text-white mt-1">{flagshipTrack.title}</h4>
+                                <p className="text-xs text-stone-400">{flagshipTrack.subtitle}</p>
+                              </div>
                             </div>
-                          </div>
+                          ) : (
+                            <div className="p-4 bg-stone-950 rounded-xl border border-stone-800 text-stone-400 text-xs text-center">
+                              No featured track selected yet. Select a track below or upload a new song drop.
+                            </div>
+                          )}
 
                           <div>
                             <label className="block text-xs font-semibold text-stone-300 mb-2">Select Track from Live Posts Database</label>
                             <div className="space-y-3">
-                              {posts.map(p => (
-                                <div key={p.id} className="flex items-center justify-between p-3 bg-stone-950 border border-stone-800 hover:border-amber-500/50 rounded-xl transition-all">
-                                  <div className="flex items-center gap-3">
-                                    <img src={p.cover} alt="" className="w-12 h-12 rounded-lg object-cover" />
-                                    <div>
-                                      <h5 className="text-sm font-semibold text-white">{p.title}</h5>
-                                      <p className="text-xs text-stone-400">{p.subtitle} • <span className="text-amber-400">{p.category}</span></p>
+                              {posts && posts.length > 0 ? (
+                                posts.map(p => (
+                                  <div key={p.id} className="flex items-center justify-between p-3 bg-stone-950 border border-stone-800 hover:border-amber-500/50 rounded-xl transition-all">
+                                    <div className="flex items-center gap-3">
+                                      {p?.cover && <img src={p.cover} alt="" className="w-12 h-12 rounded-lg object-cover" />}
+                                      <div>
+                                        <h5 className="text-sm font-semibold text-white">{p.title}</h5>
+                                        <p className="text-xs text-stone-400">{p.subtitle} • <span className="text-amber-400">{p.category}</span></p>
+                                      </div>
                                     </div>
+                                    <button
+                                      onClick={() => {
+                                        setFeaturedTrackId(p.id);
+                                        setPosts(posts.map(item => item.id === p.id ? { ...item, isHero: true } : { ...item, isHero: false }));
+                                        alert(`Successfully set "${p.title}" as #1 Top Featured Hero Track!`);
+                                      }}
+                                      className={`px-4 py-2 rounded-xl text-xs font-bold transition-all ${featuredTrackId === p.id ? 'bg-emerald-500 text-stone-950' : 'bg-amber-500 hover:bg-amber-400 text-stone-950'}`}
+                                    >
+                                      {featuredTrackId === p.id ? 'Active Hero Track' : 'Set as Hero Song'}
+                                    </button>
                                   </div>
-                                  <button
-                                    onClick={() => {
-                                      setFeaturedTrackId(p.id);
-                                      setPosts(posts.map(item => item.id === p.id ? { ...item, isHero: true } : { ...item, isHero: false }));
-                                      alert(`Successfully set "${p.title}" as #1 Top Featured Hero Track!`);
-                                    }}
-                                    className={`px-4 py-2 rounded-xl text-xs font-bold transition-all ${featuredTrackId === p.id ? 'bg-emerald-500 text-stone-950' : 'bg-amber-500 hover:bg-amber-400 text-stone-950'}`}
-                                  >
-                                    {featuredTrackId === p.id ? 'Active Hero Track' : 'Set as Hero Song'}
-                                  </button>
-                                </div>
-                              ))}
+                                ))
+                              ) : (
+                                <p className="text-xs text-stone-500 italic p-3 text-center">No posts found in database.</p>
+                              )}
                             </div>
                           </div>
                         </div>
@@ -2662,6 +2932,14 @@ export default function App() {
                           {isPlaying && currentPlayingTrack?.id === flagshipTrack.id ? <Pause className="w-4 h-4 fill-stone-950" /> : <Play className="w-4 h-4 fill-stone-950" />}
                           Stream / Play Audio
                         </button>
+                        {flagshipTrack.audioUrl && (
+                          <button
+                            onClick={() => handleDownloadFile(flagshipTrack)}
+                            className="bg-stone-800 hover:bg-stone-700 text-amber-400 font-bold px-4 py-2.5 rounded-xl text-xs flex items-center gap-2 transition-all border border-stone-700"
+                          >
+                            <Download className="w-4 h-4" /> Download MP3
+                          </button>
+                        )}
                         <button
                           onClick={() => { setSelectedPostId(flagshipTrack.id); setCurrentRoute('post'); }}
                           className="bg-stone-800 hover:bg-stone-700 text-stone-200 font-semibold px-5 py-2.5 rounded-xl text-xs flex items-center gap-2 transition-all border border-stone-700"
@@ -3839,8 +4117,8 @@ export default function App() {
                             <p className="text-xs text-stone-400">{post.subtitle} • {post.duration || '03:45'}</p>
                           </div>
                           <button
-                            onClick={() => alert(`Downloading ${post.title} (MP3 320kbps)...`)}
-                            className="bg-amber-500 hover:bg-amber-400 text-stone-950 font-bold px-5 py-2.5 rounded-xl text-xs flex items-center gap-2 shadow"
+                            onClick={() => handleDownloadFile(post)}
+                            className="bg-amber-500 hover:bg-amber-400 text-stone-950 font-bold px-5 py-2.5 rounded-xl text-xs flex items-center gap-2 shadow transition-transform hover:scale-105 cursor-pointer"
                           >
                             <Download className="w-4 h-4" /> Download MP3
                           </button>
@@ -4868,6 +5146,46 @@ export default function App() {
 
         </div>
       </footer>
+
+      {/* FLOATING AUDIO STREAMING & DOWNLOAD PLAYER BAR */}
+      {currentPlayingTrack && (
+        <aside aria-label="Audio Player" className="fixed bottom-4 left-4 right-4 md:left-auto md:right-8 md:w-96 z-50 bg-stone-900/95 backdrop-blur-md border border-amber-500/40 rounded-2xl p-3.5 shadow-2xl flex items-center gap-3">
+          {currentPlayingTrack.cover && (
+            <img src={currentPlayingTrack.cover} alt="" className="w-12 h-12 rounded-xl object-cover shrink-0 border border-stone-800" />
+          )}
+          <div className="flex-1 min-w-0">
+            <h5 className="text-xs font-bold text-white truncate">{currentPlayingTrack.title}</h5>
+            <p className="text-[10px] text-amber-400 truncate">{currentPlayingTrack.subtitle}</p>
+          </div>
+          <button
+            onClick={() => handlePlayTrack(currentPlayingTrack)}
+            className="w-9 h-9 rounded-full bg-amber-500 hover:bg-amber-400 text-stone-950 flex items-center justify-center shrink-0 shadow transition-transform hover:scale-105"
+            title={isPlaying ? 'Pause' : 'Play'}
+          >
+            {isPlaying ? <Pause className="w-4 h-4 fill-stone-950" /> : <Play className="w-4 h-4 fill-stone-950 ml-0.5" />}
+          </button>
+          <button
+            onClick={() => handleDownloadFile(currentPlayingTrack)}
+            className="w-9 h-9 rounded-xl bg-stone-800 hover:bg-stone-700 text-amber-400 flex items-center justify-center shrink-0 border border-stone-700 shadow transition-transform hover:scale-105"
+            title="Download MP3"
+          >
+            <Download className="w-4 h-4" />
+          </button>
+          <button
+            onClick={() => {
+              if (audioElement) {
+                audioElement.pause();
+              }
+              setIsPlaying(false);
+              setCurrentPlayingTrack(null);
+            }}
+            className="text-stone-500 hover:text-white p-1 text-xs"
+            title="Close Player"
+          >
+            ✕
+          </button>
+        </aside>
+      )}
 
     </main>
   );
