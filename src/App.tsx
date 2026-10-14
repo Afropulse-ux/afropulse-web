@@ -864,8 +864,10 @@ export default function App() {
   });
 
   // Admin Uploader Form State (Direct File Pickers)
+  const [isPublishingPost, setIsPublishingPost] = useState(false);
   const [uform, setUform] = useState({
     title: '',
+    mainArtist: '',
     subtitle: '',
     category: 'MUSIC' as 'MUSIC' | 'VIDEOS' | 'NEWS' | 'AMAPIANO',
     coverFile: null as File | null,
@@ -1235,7 +1237,11 @@ export default function App() {
 
     try {
       // 1. Send DELETE query to Supabase
-      if (item.tableSource === 'music' && item.supabaseId) {
+      if (item.tableSource === 'posts' && item.supabaseId) {
+        await supabase.from('posts').delete().eq('id', item.supabaseId).catch(err =>
+          console.warn('Supabase post delete notice:', err)
+        );
+      } else if (item.tableSource === 'music' && item.supabaseId) {
         await deleteSupabaseRecord('music', item.supabaseId).catch(err =>
           console.warn('Supabase music delete notice:', err)
         );
@@ -1243,6 +1249,8 @@ export default function App() {
         await deleteSupabaseRecord('videos', item.supabaseId).catch(err =>
           console.warn('Supabase video delete notice:', err)
         );
+      } else {
+        await supabase.from('posts').delete().ilike('title', item.title).catch(() => {});
       }
 
       // 2. Immediately remove record from admin list view
@@ -1328,210 +1336,223 @@ export default function App() {
       return;
     }
 
-    if (editingRecord) {
-      try {
-        let finalCover = uform.coverPreview;
-        let finalAudio = uform.audioFile ? URL.createObjectURL(uform.audioFile) : '';
-        if (uform.coverFile) {
-          finalCover = await uploadStorageAsset('cover_art', uform.coverFile).catch(() => uform.coverPreview);
-        }
-        if (uform.audioFile) {
-          finalAudio = await uploadStorageAsset('music_files', uform.audioFile).catch(() => '');
-        }
-
-        await updateSupabaseRecord(editingRecord.tableSource, editingRecord.id, {
-          title: uform.title,
-          artist: uform.subtitle || 'AfroPulse Artist',
-          genre: uform.category === 'AMAPIANO' ? 'Amapiano' : 'Afrobeats',
-          description: uform.body,
-          cover_url: finalCover,
-          audio_url: finalAudio || undefined,
-          youtube_url: uform.youtubeUrl || undefined
-        });
-
-        alert('Post updated successfully in Supabase!');
-        setEditingRecord(null);
-        setUform({
-          title: '',
-          subtitle: '',
-          category: 'MUSIC',
-          coverFile: null,
-          coverPreview: '',
-          audioFile: null,
-          videoFile: null,
-          youtubeUrl: '',
-          body: '',
-          lyrics: '',
-          spotify: '',
-          tiktok: '',
-          instagram: '',
-          twitter: '',
-          youtubeChannel: '',
-          isHero: false
-        });
-        await refreshAdminContent();
-        return;
-      } catch (err) {
-        console.error('Update error:', err);
-        alert('Error updating record in Supabase.');
-      }
-    }
-
-    // Upload files to Supabase Storage if user selected files
-    let finalCoverUrl = uform.coverPreview || 'https://images.unsplash.com/photo-1514525253161-7a46d19cd819?auto=format&fit=crop&w=800&q=80';
-    let finalAudioUrl = '';
-    let finalVideoUrl = uform.youtubeUrl || '';
-
-    if (uform.coverFile) {
-      try {
-        finalCoverUrl = await uploadStorageAsset('cover_art', uform.coverFile);
-      } catch (err) {
-        console.warn('Cover upload failed, using fallback/preview:', err);
-      }
-    }
-
-    if (uform.audioFile) {
-      try {
-        finalAudioUrl = await uploadStorageAsset('music_files', uform.audioFile);
-      } catch (err) {
-        console.warn('Audio upload failed, using blob/fallback:', err);
-        finalAudioUrl = URL.createObjectURL(uform.audioFile);
-      }
-    }
-
-    if (uform.videoFile) {
-      try {
-        finalVideoUrl = await uploadStorageAsset('video_files', uform.videoFile);
-      } catch (err) {
-        console.warn('Video upload failed, using fallback:', err);
-        finalVideoUrl = URL.createObjectURL(uform.videoFile);
-      }
-    }
-
-    // 1. Mandatory Awaited Insert into Supabase 'posts' Table
+    setIsPublishingPost(true);
     try {
-      const { error: postInsertError } = await supabase.from('posts').insert([
-        {
-          title: uform.title,
-          subtitle: uform.subtitle || 'AfroPulse Exclusive',
-          category: uform.category,
-          cover: finalCoverUrl,
-          cover_url: finalCoverUrl,
-          audio_url: finalAudioUrl || undefined,
-          video_url: finalVideoUrl || undefined,
-          body: uform.body || '',
-          description: uform.body || '',
-          lyrics: uform.lyrics || '',
-          is_hero: uform.isHero,
-          spotify: uform.spotify || '',
-          tiktok: uform.tiktok || '',
-          instagram: uform.instagram || '',
-          twitter: uform.twitter || '',
-          youtube_channel: uform.youtubeChannel || ''
-        }
-      ]);
+      const finalArtistName = uform.mainArtist?.trim()
+        ? (uform.subtitle?.trim() ? `${uform.mainArtist.trim()} ${uform.subtitle.trim()}` : uform.mainArtist.trim())
+        : (uform.subtitle?.trim() || 'AfroPulse Artist');
 
-      if (postInsertError) {
-        console.warn('Supabase posts insert notice, attempting minimal schema:', postInsertError);
-        await supabase.from('posts').insert([
+      if (editingRecord) {
+        try {
+          let finalCover = uform.coverPreview;
+          let finalAudio = uform.audioFile ? URL.createObjectURL(uform.audioFile) : '';
+          if (uform.coverFile) {
+            finalCover = await uploadStorageAsset('cover_art', uform.coverFile, 4000).catch(() => uform.coverPreview);
+          }
+          if (uform.audioFile) {
+            finalAudio = await uploadStorageAsset('music_files', uform.audioFile, 4000).catch(() => '');
+          }
+
+          await updateSupabaseRecord(editingRecord.tableSource, editingRecord.id, {
+            title: uform.title,
+            artist: finalArtistName,
+            genre: uform.category === 'AMAPIANO' ? 'Amapiano' : 'Afrobeats',
+            description: uform.body,
+            cover_url: finalCover,
+            audio_url: finalAudio || undefined,
+            youtube_url: uform.youtubeUrl || undefined
+          });
+
+          alert('Post updated successfully in Supabase!');
+          setEditingRecord(null);
+          setUform({
+            title: '',
+            mainArtist: '',
+            subtitle: '',
+            category: 'MUSIC',
+            coverFile: null,
+            coverPreview: '',
+            audioFile: null,
+            videoFile: null,
+            youtubeUrl: '',
+            body: '',
+            lyrics: '',
+            spotify: '',
+            tiktok: '',
+            instagram: '',
+            twitter: '',
+            youtubeChannel: '',
+            isHero: false
+          });
+          await refreshAdminContent();
+          return;
+        } catch (err) {
+          console.error('Update error:', err);
+          alert('Error updating record in Supabase.');
+        }
+      }
+
+      // Upload files to Supabase Storage with fast fallback so button never freezes
+      let finalCoverUrl = uform.coverPreview || 'https://images.unsplash.com/photo-1514525253161-7a46d19cd819?auto=format&fit=crop&w=800&q=80';
+      let finalAudioUrl = '';
+      let finalVideoUrl = uform.youtubeUrl || '';
+
+      if (uform.coverFile) {
+        try {
+          finalCoverUrl = await uploadStorageAsset('cover_art', uform.coverFile, 4000);
+        } catch (err) {
+          console.warn('Cover upload failed or timed out, using fallback/preview:', err);
+          finalCoverUrl = uform.coverPreview || finalCoverUrl;
+        }
+      }
+
+      if (uform.audioFile) {
+        try {
+          finalAudioUrl = await uploadStorageAsset('music_files', uform.audioFile, 4000);
+        } catch (err) {
+          console.warn('Audio upload failed or timed out, using blob/fallback:', err);
+          finalAudioUrl = URL.createObjectURL(uform.audioFile);
+        }
+      }
+
+      if (uform.videoFile) {
+        try {
+          finalVideoUrl = await uploadStorageAsset('video_files', uform.videoFile, 4000);
+        } catch (err) {
+          console.warn('Video upload failed or timed out, using fallback:', err);
+          finalVideoUrl = URL.createObjectURL(uform.videoFile);
+        }
+      }
+
+      // 1. Mandatory Awaited Insert into Supabase 'posts' Table
+      try {
+        const { error: postInsertError } = await supabase.from('posts').insert([
           {
             title: uform.title,
-            subtitle: uform.subtitle || 'AfroPulse Exclusive',
+            subtitle: finalArtistName,
+            artist: uform.mainArtist?.trim() || finalArtistName,
             category: uform.category,
             cover: finalCoverUrl,
+            cover_url: finalCoverUrl,
             audio_url: finalAudioUrl || undefined,
             video_url: finalVideoUrl || undefined,
-            body: uform.body || ''
+            body: uform.body || '',
+            description: uform.body || '',
+            lyrics: uform.lyrics || '',
+            is_hero: uform.isHero,
+            spotify: uform.spotify || '',
+            tiktok: uform.tiktok || '',
+            instagram: uform.instagram || '',
+            twitter: uform.twitter || '',
+            youtube_channel: uform.youtubeChannel || ''
           }
-        ]).catch(e => console.warn('Fallback minimal posts insert notice:', e));
-      }
-    } catch (insertErr) {
-      console.warn('Error saving to posts table:', insertErr);
-    }
+        ]);
 
-    // Also sync to music / videos tables to guarantee multi-table persistence
-    if (uform.category === 'VIDEOS' || uform.category === 'MOVIES') {
-      await supabase.from('videos').insert([
-        {
-          title: uform.title,
-          artist: uform.subtitle || 'AfroPulse Artist',
-          category: uform.category === 'MOVIES' ? 'movie_premiere' : 'music_video',
-          thumbnail_url: finalCoverUrl,
-          video_url: finalVideoUrl || null,
-          youtube_url: uform.youtubeUrl || null,
-          description: uform.body || ''
+        if (postInsertError) {
+          console.warn('Supabase posts insert notice, attempting minimal schema:', postInsertError);
+          await supabase.from('posts').insert([
+            {
+              title: uform.title,
+              subtitle: finalArtistName,
+              category: uform.category,
+              cover: finalCoverUrl,
+              audio_url: finalAudioUrl || undefined,
+              video_url: finalVideoUrl || undefined,
+              body: uform.body || ''
+            }
+          ]).catch(e => console.warn('Fallback minimal posts insert notice:', e));
         }
-      ]).catch(e => console.warn('videos table sync notice:', e));
-    } else {
-      await supabase.from('music').insert([
-        {
-          title: uform.title,
-          artist: uform.subtitle || 'AfroPulse Artist',
-          genre: uform.category === 'AMAPIANO' ? 'Amapiano' : 'Afrobeats',
-          track_type: 'song',
-          audio_url: finalAudioUrl || 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3',
-          cover_url: finalCoverUrl,
-          is_featured: uform.isHero,
-          is_hero: uform.isHero,
-          description: uform.body || ''
-        }
-      ]).catch(e => console.warn('music table sync notice:', e));
-    }
-
-    const newPost: PostItem = {
-      id: Date.now().toString(),
-      title: uform.title,
-      subtitle: uform.subtitle || 'AfroPulse Exclusive',
-      category: uform.category,
-      cover: finalCoverUrl,
-      date: 'Just now',
-      duration: '03:30',
-      downloads: '12',
-      body: uform.body,
-      lyrics: uform.lyrics ? uform.lyrics.split('\n') : undefined,
-      audioUrl: finalAudioUrl || (uform.audioFile ? URL.createObjectURL(uform.audioFile) : 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3'),
-      videoUrl: finalVideoUrl || (uform.videoFile ? URL.createObjectURL(uform.videoFile) : (uform.youtubeUrl || undefined)),
-      isHero: uform.isHero,
-      socials: {
-        spotify: uform.spotify,
-        tiktok: uform.tiktok,
-        instagram: uform.instagram,
-        twitter: uform.twitter,
-        youtube: uform.youtubeChannel
+      } catch (insertErr) {
+        console.warn('Error saving to posts table:', insertErr);
       }
-    };
 
-    let updated = [newPost, ...posts];
-    if (uform.isHero) {
-      updated = updated.map(p => p.id === newPost.id ? { ...p, isHero: true } : { ...p, isHero: false });
-      setFeaturedTrackId(newPost.id);
+      // Also sync to music / videos tables to guarantee multi-table persistence
+      if (uform.category === 'VIDEOS' || uform.category === 'MOVIES') {
+        await supabase.from('videos').insert([
+          {
+            title: uform.title,
+            artist: finalArtistName,
+            category: uform.category === 'MOVIES' ? 'movie_premiere' : 'music_video',
+            thumbnail_url: finalCoverUrl,
+            video_url: finalVideoUrl || null,
+            youtube_url: uform.youtubeUrl || null,
+            description: uform.body || ''
+          }
+        ]).catch(e => console.warn('videos table sync notice:', e));
+      } else {
+        await supabase.from('music').insert([
+          {
+            title: uform.title,
+            artist: finalArtistName,
+            genre: uform.category === 'AMAPIANO' ? 'Amapiano' : 'Afrobeats',
+            track_type: 'song',
+            audio_url: finalAudioUrl || 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3',
+            cover_url: finalCoverUrl,
+            is_featured: uform.isHero,
+            is_hero: uform.isHero,
+            description: uform.body || ''
+          }
+        ]).catch(e => console.warn('music table sync notice:', e));
+      }
+
+      const newPost: PostItem = {
+        id: Date.now().toString(),
+        title: uform.title,
+        subtitle: finalArtistName,
+        category: uform.category,
+        cover: finalCoverUrl,
+        date: 'Just now',
+        duration: '03:30',
+        downloads: '12',
+        body: uform.body,
+        lyrics: uform.lyrics ? uform.lyrics.split('\n') : undefined,
+        audioUrl: finalAudioUrl || (uform.audioFile ? URL.createObjectURL(uform.audioFile) : 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3'),
+        videoUrl: finalVideoUrl || (uform.videoFile ? URL.createObjectURL(uform.videoFile) : (uform.youtubeUrl || undefined)),
+        isHero: uform.isHero,
+        socials: {
+          spotify: uform.spotify,
+          tiktok: uform.tiktok,
+          instagram: uform.instagram,
+          twitter: uform.twitter,
+          youtube: uform.youtubeChannel
+        }
+      };
+
+      let updated = [newPost, ...posts];
+      if (uform.isHero) {
+        updated = updated.map(p => p.id === newPost.id ? { ...p, isHero: true } : { ...p, isHero: false });
+        setFeaturedTrackId(newPost.id);
+      }
+      setPosts(updated);
+
+      alert('Post published successfully to live AfroPulse feed and Supabase database!');
+
+      // Clean reset of all form fields (Requirement 3)
+      setUform({
+        title: '',
+        mainArtist: '',
+        subtitle: '',
+        category: 'MUSIC',
+        coverFile: null,
+        coverPreview: '',
+        audioFile: null,
+        videoFile: null,
+        youtubeUrl: '',
+        body: '',
+        lyrics: '',
+        spotify: '',
+        tiktok: '',
+        instagram: '',
+        twitter: '',
+        youtubeChannel: '',
+        isHero: false
+      });
+
+      await fetchAllSupabaseContent();
+      await refreshAdminContent();
+    } finally {
+      setIsPublishingPost(false);
     }
-    setPosts(updated);
-
-    alert('Post published successfully to live AfroPulse feed and Supabase database!');
-
-    // Clean reset of all form fields (Requirement 3)
-    setUform({
-      title: '',
-      subtitle: '',
-      category: 'MUSIC',
-      coverFile: null,
-      coverPreview: '',
-      audioFile: null,
-      videoFile: null,
-      youtubeUrl: '',
-      body: '',
-      lyrics: '',
-      spotify: '',
-      tiktok: '',
-      instagram: '',
-      twitter: '',
-      youtubeChannel: '',
-      isHero: false
-    });
-
-    await fetchAllSupabaseContent();
-    await refreshAdminContent();
   };
 
   const handlePublishBeat = async (e: React.FormEvent) => {
@@ -2029,15 +2050,25 @@ export default function App() {
 
                         {/* Uploader Form */}
                         <form onSubmit={handlePublishPost} className="bg-stone-900/90 border border-stone-800 rounded-2xl p-6 space-y-6">
-                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                             <div>
-                              <label className="block text-xs font-semibold text-stone-300 mb-1">Track / Article Title</label>
+                              <label className="block text-xs font-semibold text-stone-300 mb-1">Track / Article Title *</label>
                               <input
                                 type="text"
                                 required
                                 value={uform.title}
                                 onChange={(e) => setUform({ ...uform, title: e.target.value })}
-                                placeholder="e.g. Omo Ologo (Remix)"
+                                placeholder="e.g. Omo Ologo"
+                                className="w-full bg-stone-950 border border-stone-800 rounded-xl px-4 py-2.5 text-sm text-stone-100 focus:outline-none focus:border-amber-500"
+                              />
+                            </div>
+                            <div>
+                              <label className="block text-xs font-semibold text-stone-300 mb-1">Main Artist Name</label>
+                              <input
+                                type="text"
+                                value={uform.mainArtist}
+                                onChange={(e) => setUform({ ...uform, mainArtist: e.target.value })}
+                                placeholder="e.g. Asake / Rema / Burna Boy"
                                 className="w-full bg-stone-950 border border-stone-800 rounded-xl px-4 py-2.5 text-sm text-stone-100 focus:outline-none focus:border-amber-500"
                               />
                             </div>
@@ -2212,9 +2243,17 @@ export default function App() {
 
                           <button
                             type="submit"
-                            className="w-full bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-stone-950 font-bold py-3.5 rounded-xl shadow-lg transition-all"
+                            disabled={isPublishingPost}
+                            className="w-full bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 disabled:opacity-60 disabled:cursor-not-allowed text-stone-950 font-bold py-3.5 rounded-xl shadow-lg transition-all flex items-center justify-center gap-2"
                           >
-                            Publish Post to Live AfroPulse Feed
+                            {isPublishingPost ? (
+                              <>
+                                <span className="w-4 h-4 border-2 border-stone-950 border-t-transparent rounded-full animate-spin"></span>
+                                <span>Publishing & Syncing to Supabase...</span>
+                              </>
+                            ) : (
+                              <span>Publish Post to Live AfroPulse Feed</span>
+                            )}
                           </button>
                         </form>
 

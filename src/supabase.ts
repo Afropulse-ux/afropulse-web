@@ -122,18 +122,28 @@ export async function uploadVideoContent(videoData: {
   return data;
 }
 
-// 3. Helper to upload raw file to any bucket and get public URL
+// 3. Helper to upload raw file to any bucket and get public URL (with safety timeout)
 export async function uploadStorageAsset(
   bucket: 'music_files' | 'cover_art' | 'video_files',
-  file: File
+  file: File,
+  timeoutMs: number = 5000
 ): Promise<string> {
   const sanitizedName = file.name.replace(/[^a-zA-Z0-9.-]/g, '_');
   const fileName = `${bucket.replace('_', '-')}-${Date.now()}-${sanitizedName}`;
-  const { error: uploadError } = await supabase.storage.from(bucket).upload(fileName, file);
-  if (uploadError) throw uploadError;
 
-  const { data: urlData } = supabase.storage.from(bucket).getPublicUrl(fileName);
-  return urlData.publicUrl;
+  const uploadAction = async () => {
+    const { error: uploadError } = await supabase.storage.from(bucket).upload(fileName, file);
+    if (uploadError) throw uploadError;
+
+    const { data: urlData } = supabase.storage.from(bucket).getPublicUrl(fileName);
+    return urlData.publicUrl;
+  };
+
+  const timeoutAction = new Promise<never>((_, reject) => {
+    setTimeout(() => reject(new Error(`Storage upload timed out after ${timeoutMs}ms`)), timeoutMs);
+  });
+
+  return Promise.race([uploadAction(), timeoutAction]);
 }
 
 // 4. Fetch all music records from Supabase
