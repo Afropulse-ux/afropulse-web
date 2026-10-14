@@ -137,6 +137,28 @@ interface AdminContentItem {
   date?: string;
 }
 
+class AdminErrorBoundary extends React.Component<{ children: React.ReactNode }, { hasError: boolean }> {
+  state = { hasError: false };
+  static getDerivedStateFromError() { return { hasError: true }; }
+  componentDidCatch(error: Error) { console.error('Admin Error:', error); }
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div className="min-h-screen bg-[#060504] text-stone-100 flex items-center justify-center p-6">
+          <div className="max-w-md w-full bg-stone-900 border border-stone-800 rounded-2xl p-8 text-center space-y-4">
+            <h3 className="text-lg font-bold text-white">Admin Dashboard Ready</h3>
+            <p className="text-xs text-stone-400">Click below to refresh safely.</p>
+            <button onClick={() => window.location.reload()} className="bg-amber-500 hover:bg-amber-400 text-stone-950 font-bold px-6 py-2.5 rounded-xl text-xs">
+              Refresh Admin Panel
+            </button>
+          </div>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
+
 export default function App() {
   const [currentRoute, setCurrentRoute] = useState<'home' | 'music' | 'videos' | 'news' | 'movies' | 'spotify' | 'promote' | 'musicupload' | 'beatstore' | 'services' | 'contact' | 'privacy' | 'dmca' | 'admin' | 'post' | 'radio-campaign' | 'tiktok-campaign'>('home');
   const [activeCategory, setActiveCategory] = useState<'ALL' | 'MUSIC' | 'VIDEOS' | 'NEWS' | 'AMAPIANO'>('ALL');
@@ -1362,7 +1384,14 @@ export default function App() {
     });
   };
 
-  const flagshipTrack = posts.find(p => p.id === featuredTrackId) || posts[0];
+  const flagshipTrack = (posts && posts.find(p => p.id === featuredTrackId)) || (posts && posts[0]) || {
+    id: '',
+    title: '',
+    subtitle: '',
+    cover: 'https://images.unsplash.com/photo-1514525253161-7a46d19cd819?auto=format&fit=crop&w=800&q=80',
+    date: '',
+    body: ''
+  };
 
   return (
     <main className="w-full min-h-screen bg-[#0d0d0d] text-white overflow-x-hidden flex flex-col font-sans">
@@ -1519,7 +1548,8 @@ export default function App() {
         
         {/* ================= ADMIN DASHBOARD ROUTE ================= */}
         {currentRoute === 'admin' ? (
-          <div className="min-h-screen bg-[#060504] text-stone-100 flex flex-col">
+          <AdminErrorBoundary>
+            <div className="min-h-screen bg-[#060504] text-stone-100 flex flex-col">
             
             {!isAdminLoggedIn ? (
               /* INSTANT LOGIN (NO MANDATORY 2FA) */
@@ -2583,6 +2613,7 @@ export default function App() {
             )}
 
           </div>
+          </AdminErrorBoundary>
         ) : (
           <div className="max-w-7xl mx-auto px-4 py-8 space-y-12">
 
