@@ -53,7 +53,8 @@ import {
   fetchSupabaseMusic,
   fetchSupabaseVideos,
   updateSupabaseRecord,
-  deleteSupabaseRecord
+  deleteSupabaseRecord,
+  convertGoogleDriveLink
 } from './supabase';
 export {
   supabase,
@@ -63,7 +64,8 @@ export {
   fetchSupabaseMusic,
   fetchSupabaseVideos,
   updateSupabaseRecord,
-  deleteSupabaseRecord
+  deleteSupabaseRecord,
+  convertGoogleDriveLink
 };
 
 interface PostItem {
@@ -884,7 +886,8 @@ export default function App() {
     youtubeChannel: '',
     isHero: false,
     uploadType: 'SINGLE' as 'SINGLE' | 'EP_ALBUM',
-    epDescription: ''
+    epDescription: '',
+    driveAudioLink: ''
   });
 
   // Admin Beat Uploader State
@@ -1415,6 +1418,8 @@ export default function App() {
           console.warn('Audio upload failed, using blob/fallback:', err);
           finalAudioUrl = URL.createObjectURL(uform.audioFile);
         }
+      } else if (uform.driveAudioLink) {
+        finalAudioUrl = convertGoogleDriveLink(uform.driveAudioLink);
       }
 
       if (uform.videoFile) {
@@ -1551,7 +1556,8 @@ export default function App() {
         youtubeChannel: '',
         isHero: false,
         uploadType: 'SINGLE',
-        epDescription: ''
+        epDescription: '',
+        driveAudioLink: ''
       });
 
       await fetchAllSupabaseContent();
@@ -2175,6 +2181,13 @@ export default function App() {
                                 accept="audio/*"
                                 onChange={(e) => handleFileChange(e, 'uform', 'audio')}
                                 className="w-full text-xs text-stone-400 file:mr-2 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-amber-500 file:text-stone-950 hover:file:bg-amber-400 cursor-pointer"
+                              />
+                              <input
+                                type="text"
+                                placeholder="Or Google Drive Link"
+                                value={uform.driveAudioLink}
+                                onChange={(e) => setUform({ ...uform, driveAudioLink: e.target.value })}
+                                className="w-full bg-stone-900 border border-stone-800 rounded-xl px-3 py-2 text-xs text-stone-100 mt-2"
                               />
                             </div>
 
