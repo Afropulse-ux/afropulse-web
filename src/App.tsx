@@ -882,7 +882,9 @@ export default function App() {
     instagram: '',
     twitter: '',
     youtubeChannel: '',
-    isHero: false
+    isHero: false,
+    uploadType: 'SINGLE' as 'SINGLE' | 'EP_ALBUM',
+    epDescription: ''
   });
 
   // Admin Beat Uploader State
@@ -1399,27 +1401,27 @@ export default function App() {
 
       if (uform.coverFile) {
         try {
-          finalCoverUrl = await uploadStorageAsset('cover_art', uform.coverFile, 4000);
+          finalCoverUrl = await uploadStorageAsset('cover_art', uform.coverFile);
         } catch (err) {
-          console.warn('Cover upload failed or timed out, using fallback/preview:', err);
+          console.warn('Cover upload failed, using fallback/preview:', err);
           finalCoverUrl = uform.coverPreview || finalCoverUrl;
         }
       }
 
       if (uform.audioFile) {
         try {
-          finalAudioUrl = await uploadStorageAsset('music_files', uform.audioFile, 4000);
+          finalAudioUrl = await uploadStorageAsset('music_files', uform.audioFile);
         } catch (err) {
-          console.warn('Audio upload failed or timed out, using blob/fallback:', err);
+          console.warn('Audio upload failed, using blob/fallback:', err);
           finalAudioUrl = URL.createObjectURL(uform.audioFile);
         }
       }
 
       if (uform.videoFile) {
         try {
-          finalVideoUrl = await uploadStorageAsset('video_files', uform.videoFile, 4000);
+          finalVideoUrl = await uploadStorageAsset('video_files', uform.videoFile);
         } catch (err) {
-          console.warn('Video upload failed or timed out, using fallback:', err);
+          console.warn('Video upload failed, using fallback:', err);
           finalVideoUrl = URL.createObjectURL(uform.videoFile);
         }
       }
@@ -1444,7 +1446,9 @@ export default function App() {
             tiktok: uform.tiktok || '',
             instagram: uform.instagram || '',
             twitter: uform.twitter || '',
-            youtube_channel: uform.youtubeChannel || ''
+            youtube_channel: uform.youtubeChannel || '',
+            upload_type: uform.uploadType,
+            ep_description: uform.epDescription || ''
           }
         ]);
 
@@ -1545,7 +1549,9 @@ export default function App() {
         instagram: '',
         twitter: '',
         youtubeChannel: '',
-        isHero: false
+        isHero: false,
+        uploadType: 'SINGLE',
+        epDescription: ''
       });
 
       await fetchAllSupabaseContent();
@@ -2073,6 +2079,31 @@ export default function App() {
                               />
                             </div>
                             <div>
+                              <label className="block text-xs font-semibold text-stone-300 mb-1">Upload Type</label>
+                              <select
+                                value={uform.uploadType}
+                                onChange={(e) => setUform({ ...uform, uploadType: e.target.value as 'SINGLE' | 'EP_ALBUM' })}
+                                className="w-full bg-stone-950 border border-stone-800 rounded-xl px-4 py-2.5 text-sm text-stone-100 focus:outline-none focus:border-amber-500"
+                              >
+                                <option value="SINGLE">Single Track</option>
+                                <option value="EP_ALBUM">EP / Album Release</option>
+                              </select>
+                            </div>
+                          </div>
+
+                          {uform.uploadType === 'EP_ALBUM' && (
+                            <div>
+                              <label className="block text-xs font-semibold text-stone-300 mb-1">EP Description / Tracklist</label>
+                              <textarea
+                                value={uform.epDescription}
+                                onChange={(e) => setUform({ ...uform, epDescription: e.target.value })}
+                                placeholder="Enter EP tracklist or description..."
+                                className="w-full bg-stone-950 border border-stone-800 rounded-xl px-4 py-2.5 text-sm text-stone-100 focus:outline-none focus:border-amber-500"
+                                rows={3}
+                              />
+                            </div>
+                          )}
+                            <div>
                               <label className="block text-xs font-semibold text-stone-300 mb-1">Featured Artist(s) / Subtitle</label>
                               <input
                                 type="text"
@@ -2082,7 +2113,7 @@ export default function App() {
                                 className="w-full bg-stone-950 border border-stone-800 rounded-xl px-4 py-2.5 text-sm text-stone-100 focus:outline-none focus:border-amber-500"
                               />
                             </div>
-                          </div>
+
 
                           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                             <div>
