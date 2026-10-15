@@ -1417,6 +1417,9 @@ export default function App() {
     }
   };
 
+  const [editingPostId, setEditingPostId] = useState<string | null>(null);
+  const [middleImageUrl, setMiddleImageUrl] = useState('');
+
   const handlePublishPost = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!title) {
@@ -1427,59 +1430,75 @@ export default function App() {
     setIsPublishingPost(true);
     setStatusMessage('Starting publish...');
 
-    const rawCat = (category || 'music').toLowerCase().trim();
-    let catNormalized = 'audio';
-    if (rawCat === 'video' || rawCat === 'videos' || rawCat === 'movie' || rawCat === 'movies') {
-      catNormalized = 'movie';
-    } else if (rawCat === 'news') {
-      catNormalized = 'news';
-    } else if (rawCat === 'beats' || rawCat === 'beat') {
-      catNormalized = 'beats';
-    } else {
-      catNormalized = 'audio';
-    }
+    try {
+      const rawCat = (category || 'music').toLowerCase().trim();
+      let catNormalized = 'audio';
+      if (rawCat === 'video' || rawCat === 'videos' || rawCat === 'movie' || rawCat === 'movies') {
+        catNormalized = 'movie';
+      } else if (rawCat === 'news') {
+        catNormalized = 'news';
+      } else if (rawCat === 'beats' || rawCat === 'beat') {
+        catNormalized = 'beats';
+      } else {
+        catNormalized = 'audio';
+      }
 
-    // Upload image if coverFile exists
-    let finalImageUrl = imageUrl;
-    if (coverFile) {
+      // Upload image if coverFile exists
+      let finalImageUrl = imageUrl;
+      if (coverFile) {
         setStatusMessage('Uploading cover art...');
         const { data, error } = await supabase.storage.from('cover_art').upload(`${Date.now()}_${coverFile.name}`, coverFile);
         if (data) {
-            const { data: publicUrlData } = supabase.storage.from('cover_art').getPublicUrl(data.path);
-            finalImageUrl = publicUrlData.publicUrl;
+          const { data: publicUrlData } = supabase.storage.from('cover_art').getPublicUrl(data.path);
+          finalImageUrl = publicUrlData.publicUrl;
         }
-    }
+      }
 
-    const postData = {
-      title: title,
-      artist: artist || 'HD Sounz',
-      featured_artist: featuredArtist || '',
-      genre: category,
-      category: catNormalized,
-      audioLink: driveAudioLink || audioUrl,
-      videoLink: youtubeUrl || videoUrl,
-      body: content,
-      content: content,
-      imageUrl: finalImageUrl
-    };
+      const postData = {
+        title: title,
+        artist: artist || 'HD Sounz',
+        featured_artist: featuredArtist || '',
+        genre: category,
+        category: catNormalized,
+        audioLink: driveAudioLink || audioUrl,
+        videoLink: youtubeUrl || videoUrl,
+        body: content,
+        content: content,
+        imageUrl: finalImageUrl,
+        middle_image_url: middleImageUrl
+      };
 
-    const result = await handlePublishWithStatus(postData, coverFile, audioFile, setStatusMessage);
-    setIsPublishingPost(false);
+      let result;
+      if (editingPostId) {
+        result = await supabase.from('posts').update(postData).eq('id', editingPostId);
+      } else {
+        result = await supabase.from('posts').insert([postData]);
+      }
 
-    if (result.success) {
-      alert('Post Published Successfully!');
-      alert('Post Published Successfully!');
+      if (result.error) throw new Error(result.error.message);
+      
+      alert('Post ' + (editingPostId ? 'Updated' : 'Published') + ' Successfully!');
+      
+      // Reset form
       setTitle('');
       setArtist('');
       setFeaturedArtist('');
       setContent('');
       setImageUrl('');
+      setMiddleImageUrl('');
       setAudioUrl('');
       setYoutubeUrl('');
       setCoverFile(null);
       setAudioFile(null);
+      setEditingPostId(null);
+      
       await fetchAllSupabaseContent();
       await refreshAdminContent();
+    } catch (error: any) {
+      alert('Publish failed: ' + error.message);
+    } finally {
+      setIsPublishingPost(false);
+      setStatusMessage('');
     }
   };
 
@@ -2202,27 +2221,39 @@ export default function App() {
                             </div>
                           </div>
 
-                          {/* Status Display */}
-                          {statusMessage && (
-                            <div className="p-3 bg-stone-950 border border-amber-500/30 rounded-xl text-amber-400 text-xs text-center font-mono">
-                              {statusMessage}
-                            </div>
-                          )}
+                          {/* Middle Image Uploader */}
+                          <div className="bg-stone-950 border border-stone-800 p-4 rounded-xl space-y-2">
+                             <label className="block text-xs font-bold text-stone-300">Middle Post Image (Optional)</label>
+                             <input
+                               type="text"
+                               placeholder="Image URL"
+                               value={middleImageUrl}
+                               onChange={(e) => setMiddleImageUrl(e.target.value)}
+                               className="w-full bg-stone-900 border border-stone-800 rounded-xl px-4 py-2.5 text-xs text-stone-100 focus:outline-none focus:border-amber-500"
+                             />
+                           </div>
+                           
+                           {/* Status Display */}
+                           {statusMessage && (
+                             <div className="p-3 bg-stone-950 border border-amber-500/30 rounded-xl text-amber-400 text-xs text-center font-mono">
+                               {statusMessage}
+                             </div>
+                           )}
 
-                          <button
-                            type="submit"
-                            disabled={isPublishingPost}
-                            className="w-full bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 disabled:opacity-60 disabled:cursor-not-allowed text-stone-950 font-bold py-3.5 rounded-xl shadow-lg transition-all flex items-center justify-center gap-2"
-                          >
-                            {isPublishingPost ? (
-                              <>
-                                <span className="w-4 h-4 border-2 border-stone-950 border-t-transparent rounded-full animate-spin"></span>
-                                <span>Publishing & Syncing to Supabase...</span>
-                              </>
-                            ) : (
-                              <span>Publish Post to Live AfroPulse Feed</span>
-                            )}
-                          </button>
+                           <button
+                             type="submit"
+                             disabled={isPublishingPost}
+                             className="w-full bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 disabled:opacity-60 disabled:cursor-not-allowed text-stone-950 font-bold py-3.5 rounded-xl shadow-lg transition-all flex items-center justify-center gap-2"
+                           >
+                             {isPublishingPost ? (
+                               <>
+                                 <span className="w-4 h-4 border-2 border-stone-950 border-t-transparent rounded-full animate-spin"></span>
+                                 <span>{editingPostId ? 'Updating...' : 'Publishing...'}</span>
+                               </>
+                             ) : (
+                               <span>{editingPostId ? 'Update Post' : 'Publish New Post'}</span>
+                             )}
+                           </button>
                         </form>
 
                         {/* Fixed Content Manager Table */}
@@ -2251,6 +2282,24 @@ export default function App() {
                                     <td className="p-3 font-semibold text-white">{p.title}</td>
                                     <td className="p-3 text-stone-400">{p.date}</td>
                                     <td className="p-3 text-right">
+                                      <button
+                                        onClick={() => {
+                                          setEditingPostId(p.id);
+                                          setTitle(p.title);
+                                          setArtist(p.artist || '');
+                                          setFeaturedArtist(p.featured_artist || '');
+                                          setContent(p.content || '');
+                                          setCategory(p.category || 'MUSIC');
+                                          setImageUrl(p.image_url || '');
+                                          setMiddleImageUrl(p.middle_image_url || '');
+                                          setAudioUrl(p.audio_url || '');
+                                          setYoutubeUrl(p.video_url || '');
+                                          window.scrollTo({ top: 0, behavior: 'smooth' });
+                                        }}
+                                        className="bg-amber-500/10 hover:bg-amber-500/20 text-amber-400 px-3 py-1.5 rounded-lg font-medium transition-all inline-flex items-center gap-1 mr-2"
+                                      >
+                                        Edit
+                                      </button>
                                       <button
                                         onClick={() => {
                                           if (confirm(`Are you sure you want to delete "${p.title}"?`)) {

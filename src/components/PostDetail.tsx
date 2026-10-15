@@ -129,6 +129,17 @@ export const PostDetail: React.FC<PostDetailProps> = ({
           <p style={{ whiteSpace: 'pre-wrap' }}>
             {post.content || post.description || post.body}
           </p>
+
+          {post.middle_image_url && (
+            <div className="py-4">
+              <img
+                src={post.middle_image_url}
+                alt="Middle Content"
+                className="w-full rounded-xl border border-stone-800 shadow-md"
+              />
+            </div>
+          )}
+
           {post.lyrics && post.lyrics.length > 0 && (
             <div className="bg-stone-950 p-4 rounded-xl border border-stone-800 space-y-2 font-mono text-xs text-amber-300/90">
               <h5 className="font-bold text-white uppercase text-[10px] tracking-wider mb-2">
