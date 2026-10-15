@@ -19,8 +19,8 @@ export const PostCard: React.FC<PostCardProps> = ({
 }) => {
   const cat = (post.category || 'music').toLowerCase().trim();
   const isAudio = cat === 'audio' || cat === 'music';
-  const isNews = cat === 'news' || cat === 'gossip';
   const isBeats = cat === 'beats' || cat === 'beat';
+  const canPlay = (isAudio || isBeats) && post.audio_url && post.audio_url.startsWith('http');
 
   // Strictly use post.image_url first without fallback to local mock images
   const artworkSrc = post.image_url || post.cover || '';
@@ -53,7 +53,7 @@ export const PostCard: React.FC<PostCardProps> = ({
             className={`px-2 py-0.5 rounded text-[9px] font-bold uppercase ${
               isAudio
                 ? 'bg-emerald-500/20 text-emerald-400'
-                : isNews
+                : 'news' === cat
                 ? 'bg-amber-500/20 text-amber-400'
                 : isBeats
                 ? 'bg-cyan-500/20 text-cyan-400'
@@ -68,9 +68,6 @@ export const PostCard: React.FC<PostCardProps> = ({
             </span>
           )}
           <span className="text-[10px] text-stone-400">{post.date}</span>
-          <span className="text-[10px] text-stone-500">
-            • {post.downloads || post.views || '14.2K'} views
-          </span>
         </div>
 
         {/* Post Title */}
@@ -78,15 +75,15 @@ export const PostCard: React.FC<PostCardProps> = ({
           {post.title}
         </h4>
 
-        {/* 1. ARTIST & FEATURED ARTIST NAMES: Explicitly post.artist, NEVER post.title */}
+        {/* 1. ARTIST & FEATURED ARTIST NAMES: Explicitly post.artist */}
         <div className="flex items-center gap-1.5 text-xs text-stone-400 flex-wrap">
-          <span className="text-amber-400 font-semibold">{post.artist || 'AfroPulse Artist'}</span>
+          <span className="text-amber-400 font-semibold">{post.artist}</span>
           {post.featured_artist && post.featured_artist.trim() !== '' && (
             <span className="text-stone-400 font-medium">ft. {post.featured_artist}</span>
           )}
         </div>
 
-        {/* 5. TEXT FORMATTING & LINE BREAKS: style={{ whiteSpace: 'pre-wrap' }} */}
+        {/* 2. CONTENT DISPLAY: Clean paragraph with pre-wrap */}
         <p
           className="text-xs text-stone-400 line-clamp-1"
           style={{ whiteSpace: 'pre-wrap' }}
@@ -97,7 +94,7 @@ export const PostCard: React.FC<PostCardProps> = ({
 
       {/* Action Buttons: Play/Stream & Direct Download */}
       <div className="shrink-0 flex items-center gap-2">
-        {post.audio_url && onPlay && (
+        {canPlay && onPlay && (
           <button
             onClick={(e) => {
               e.stopPropagation();
@@ -114,8 +111,8 @@ export const PostCard: React.FC<PostCardProps> = ({
           </button>
         )}
 
-        {/* 3. AUDIO PLAYER, STREAMING & MP3 DOWNLOADS: direct href to post.audio_url */}
-        {post.audio_url && (
+        {/* 3. AUDIO PLAYER, STREAMING & MP3 DOWNLOADS: Restrict to valid audio/beats */}
+        {canPlay && (
           <a
             href={post.audio_url}
             download={`${(post.title || 'afropulse_track').replace(/[^a-z0-9]/gi, '_')}.mp3`}
