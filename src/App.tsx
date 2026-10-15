@@ -1443,24 +1443,10 @@ export default function App() {
         const { error: postInsertError } = await supabase.from('posts').insert([
           {
             title: uform.title,
-            subtitle: finalArtistName,
-            artist: uform.mainArtist?.trim() || finalArtistName,
-            category: uform.category,
-            cover: finalCoverUrl,
-            cover_url: finalCoverUrl,
-            audio_url: finalAudioUrl || undefined,
-            video_url: finalVideoUrl || undefined,
-            body: uform.body || '',
-            description: uform.body || '',
-            lyrics: uform.lyrics || '',
-            is_hero: uform.isHero,
-            spotify: uform.spotify || '',
-            tiktok: uform.tiktok || '',
-            instagram: uform.instagram || '',
-            twitter: uform.twitter || '',
-            youtube_channel: uform.youtubeChannel || '',
-            upload_type: uform.uploadType,
-            ep_description: uform.epDescription || ''
+            content: uform.body || '',
+            category: uform.category || 'MUSIC',
+            image_url: finalCoverUrl,
+            created_at: new Date().toISOString()
           }
         ]);
         if (postInsertError) throw postInsertError;
