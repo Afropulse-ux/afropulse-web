@@ -119,8 +119,8 @@ export const isMusicPost = (p: { category?: string; audio_url?: string; audioUrl
 // Ensure NO audio posts leak into the Movie section.
 export const isMoviePost = (p: { category?: string; audio_url?: string; audioUrl?: string; video_url?: string; videoUrl?: string }) => {
   const cat = (p.category || '').toLowerCase().trim();
-  // Strict exclusion: never allow audio or music posts to leak into movie/video feeds
-  if (cat === 'audio' || cat === 'music' || cat === 'amapiano') {
+  // Strict exclusion: never allow audio, music, beats, or news posts to leak into movie/video feeds
+  if (cat === 'audio' || cat === 'music' || cat === 'amapiano' || cat === 'beats' || cat === 'beat' || cat === 'news' || cat === 'gossip') {
     return false;
   }
   return cat === 'video' || cat === 'videos' || cat === 'movie' || cat === 'movies' || cat === 'movie_premiere';
@@ -667,7 +667,9 @@ export default function App() {
       if (postsRes.status === 'fulfilled' && postsRes.value && Array.isArray((postsRes.value as any).data)) {
         (postsRes.value as any).data.forEach((p: any) => {
           const rawCat = (p.category || '').toLowerCase().trim();
-          if (rawCat === 'beats' || rawCat === 'beat' || p.track_type === 'beat') {
+          const isBeat = rawCat === 'beats' || rawCat === 'beat' || p.track_type === 'beat';
+
+          if (isBeat) {
             const beatId = p.id?.toString() || `b-${Date.now()}`;
             const beatTitle = (p.title || 'Untitled Beat').toLowerCase().trim();
             if (!seenBeatIds.has(beatId) && !seenBeatTitles.has(beatTitle)) {
@@ -692,76 +694,76 @@ export default function App() {
                 }
               });
             }
-          } else {
-            const postId = p.id?.toString() || `p-${Date.now()}`;
-            const postTitle = (p.title || 'Untitled Post').toLowerCase().trim();
-            if (!seenPostIds.has(postId) && !seenPostTitles.has(postTitle)) {
-              seenPostIds.add(postId);
-              seenPostTitles.add(postTitle);
-              
-              // 1. Artwork mapping: explicitly prioritize image_url
-              const imgUrl = p.image_url || p.cover_url || p.cover || '';
-              // 2. Audio mapping: explicitly prioritize audio_url or audio_link
-              const audUrl = p.audio_url || p.audio_link || p.audioUrl || '';
-              // 3. Video mapping
-              const vidUrl = p.video_url || p.video_link || p.videoUrl || '';
-              // 4. Artist mapping: explicitly prioritize artist or main_artist
-              const artistName = p.artist || p.main_artist || p.subtitle || 'AfroPulse Artist';
-              // 5. Content / Description mapping
-              const postBody = p.content || p.body || p.description || 'Exclusive release on AfroPulse.';
+          }
 
-              // Strict Category Assignment:
-              // - category 'audio' or 'music' ONLY render inside Music/Audio section feed
-              // - category 'video' or 'movie' must ONLY render inside Movie section feed
-              // - category 'beats' must ONLY render inside Beats section feed
-              // - category 'news' must ONLY render inside News section feed
-              let finalCat = 'music';
-              if (rawCat === 'video' || rawCat === 'videos' || rawCat === 'movie' || rawCat === 'movies' || rawCat === 'movie_premiere') {
-                finalCat = 'movie';
-              } else if (rawCat === 'news' || rawCat === 'gossip') {
-                finalCat = 'news';
-              } else if (rawCat === 'beats' || rawCat === 'beat') {
-                finalCat = 'beats';
-              } else if (rawCat === 'audio' || rawCat === 'music' || rawCat === 'amapiano') {
-                finalCat = 'music';
-              } else if (vidUrl && !audUrl) {
-                finalCat = 'movie';
-              } else {
-                finalCat = 'music';
-              }
+          const postId = p.id?.toString() || `p-${Date.now()}`;
+          const postTitle = (p.title || 'Untitled Post').toLowerCase().trim();
+          if (!seenPostIds.has(postId) && !seenPostTitles.has(postTitle)) {
+            seenPostIds.add(postId);
+            seenPostTitles.add(postTitle);
+            
+            // 1. Artwork mapping: explicitly prioritize image_url
+            const imgUrl = p.image_url || p.cover_url || p.cover || '';
+            // 2. Audio mapping: explicitly prioritize audio_url or audio_link
+            const audUrl = p.audio_url || p.audio_link || p.audioUrl || '';
+            // 3. Video mapping
+            const vidUrl = p.video_url || p.video_link || p.videoUrl || '';
+            // 4. Artist mapping: explicitly prioritize artist or main_artist
+            const artistName = p.artist || p.main_artist || p.subtitle || (isBeat ? (p.producer || 'AfroPulse Producer') : 'AfroPulse Artist');
+            // 5. Content / Description mapping
+            const postBody = p.content || p.body || p.description || 'Exclusive release on AfroPulse.';
 
-              fetchedPosts.push({
-                id: postId,
-                title: p.title || 'Untitled Post',
-                artist: artistName,
-                subtitle: artistName,
-                category: finalCat,
-                image_url: imgUrl,
-                cover: imgUrl || 'https://images.unsplash.com/photo-1514525253161-7a46d19cd819?auto=format&fit=crop&w=800&q=80',
-                date: p.created_at ? new Date(p.created_at).toLocaleDateString() : (p.date || 'Just now'),
-                duration: p.duration || '03:30',
-                downloads: p.downloads || '1.2K',
-                views: p.views || '14.2K',
-                body: postBody,
-                content: postBody,
-                description: postBody,
-                lyrics: Array.isArray(p.lyrics) ? p.lyrics : (typeof p.lyrics === 'string' ? p.lyrics.split('\n') : undefined),
-                audioUrl: audUrl,
-                audio_url: audUrl,
-                audio_link: audUrl,
-                videoUrl: vidUrl,
-                video_url: vidUrl,
-                video_link: vidUrl,
-                isHero: Boolean(p.is_hero || p.isHero),
-                socials: {
-                  spotify: p.spotify || '',
-                  tiktok: p.tiktok || '',
-                  instagram: p.instagram || '',
-                  twitter: p.twitter || '',
-                  youtube: p.youtube || p.youtube_channel || p.youtubeChannel || ''
-                }
-              });
+            // Strict Category Assignment:
+            // - category 'audio' or 'music' ONLY render inside Music/Audio section feed
+            // - category 'video' or 'movie' must ONLY render inside Movie section feed
+            // - category 'beats' must ONLY render inside Beats section feed
+            // - category 'news' must ONLY render inside News section feed
+            let finalCat = 'music';
+            if (rawCat === 'video' || rawCat === 'videos' || rawCat === 'movie' || rawCat === 'movies' || rawCat === 'movie_premiere') {
+              finalCat = 'movie';
+            } else if (rawCat === 'news' || rawCat === 'gossip') {
+              finalCat = 'news';
+            } else if (isBeat) {
+              finalCat = 'beats';
+            } else if (rawCat === 'audio' || rawCat === 'music' || rawCat === 'amapiano') {
+              finalCat = 'music';
+            } else if (vidUrl && !audUrl) {
+              finalCat = 'movie';
+            } else {
+              finalCat = 'music';
             }
+
+            fetchedPosts.push({
+              id: postId,
+              title: p.title || 'Untitled Post',
+              artist: artistName,
+              subtitle: artistName,
+              category: finalCat,
+              image_url: imgUrl,
+              cover: imgUrl || 'https://images.unsplash.com/photo-1514525253161-7a46d19cd819?auto=format&fit=crop&w=800&q=80',
+              date: p.created_at ? new Date(p.created_at).toLocaleDateString() : (p.date || 'Just now'),
+              duration: p.duration || '03:30',
+              downloads: p.downloads || '1.2K',
+              views: p.views || '14.2K',
+              body: postBody,
+              content: postBody,
+              description: postBody,
+              lyrics: Array.isArray(p.lyrics) ? p.lyrics : (typeof p.lyrics === 'string' ? p.lyrics.split('\n') : undefined),
+              audioUrl: audUrl,
+              audio_url: audUrl,
+              audio_link: audUrl,
+              videoUrl: vidUrl,
+              video_url: vidUrl,
+              video_link: vidUrl,
+              isHero: Boolean(p.is_hero || p.isHero),
+              socials: {
+                spotify: p.spotify || '',
+                tiktok: p.tiktok || '',
+                instagram: p.instagram || '',
+                twitter: p.twitter || '',
+                youtube: p.youtube || p.youtube_channel || p.youtubeChannel || ''
+              }
+            });
           }
         });
       }
@@ -3222,8 +3224,8 @@ export default function App() {
               </div>
             )}
 
-            {/* ROUTE: BEAT STORE */}
-            {currentRoute === 'beatstore' && (() => {
+            {/* ROUTE: BEATS & BEAT STORE */}
+            {(currentRoute === 'beatstore' || currentRoute === 'beats') && (() => {
               const tierConfig: Record<'mp3' | 'wav' | 'stems' | 'exclusive', { name: string; fileType: string; streams: string; desc: string; getPrice: (b: BeatItem) => number }> = {
                 mp3: {
                   name: 'Standard MP3 Lease',
