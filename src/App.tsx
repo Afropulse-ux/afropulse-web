@@ -707,47 +707,23 @@ export default function App() {
             const ytLink = p.youtube || p.youtube_channel || p.youtube_url || '';
             const tiktokLink = p.tiktok || p.tiktok_url || '';
 
-            fetchedPosts.push({
+            const normalizedPost = {
               id: postId,
-              title: p.title || '',
-              artist: p.artist || p.artistName || '',
+              title: p.title || 'Untitled',
+              artist: p.artist || p.artist_name || p.artistName || 'Unknown Artist',
               featured_artist: p.featured_artist || p.featuredArtist || '',
-              image_url: p.image_url || p.imageUrl || '',
-              audio_url: p.audio_url || p.audioUrl || '',
-              video_url: p.video_url || p.videoUrl || '',
-              content: p.content || p.description || '',
+              content: p.content || p.body || p.description || '',
               category: p.category || 'audio',
-              subtitle: p.subtitle || (p.featured_artist || p.featuredArtist ? `${p.artist || p.artistName || ''} ft. ${p.featured_artist || p.featuredArtist || ''}` : p.artist || p.artistName || ''),
-              genre: p.genre || 'Afrobeat',
-              cover: p.image_url || p.imageUrl || '',
-              date: p.created_at ? new Date(p.created_at).toLocaleDateString() : (p.date || 'Just now'),
-              duration: p.duration || '03:30',
-              downloads: p.downloads || '1.2K',
-              views: p.views || '14.2K',
-              body: p.content || p.description || '',
-              description: p.content || p.description || '',
-              lyrics: Array.isArray(p.lyrics) ? p.lyrics : (typeof p.lyrics === 'string' ? p.lyrics.split('\n') : undefined),
-              audioUrl: p.audio_url || p.audioUrl || '',
-              audio_link: p.audio_url || p.audioUrl || '',
-              videoUrl: p.video_url || p.videoUrl || '',
-              video_link: p.video_url || p.videoUrl || '',
-              isHero: Boolean(p.is_hero || p.isHero),
-              spotify_url: spotifyLink,
-              apple_music_url: appleLink,
-              audiomack_url: audiomackLink,
-              instagram_url: instaLink,
-              twitter_url: twitterLink,
-              youtube_url: ytLink,
-              socials: {
-                spotify: spotifyLink,
-                appleMusic: appleLink,
-                audiomack: audiomackLink,
-                tiktok: tiktokLink,
-                instagram: instaLink,
-                twitter: twitterLink,
-                youtube: ytLink
-              }
-            });
+              genre: p.genre || '',
+              image_url: p.image_url || p.cover_url || p.imageUrl || p.cover || '',
+              audio_url: p.audio_url || p.music_url || p.audioUrl || '',
+              video_url: p.video_url || p.videoUrl || '',
+              spotify_url: p.spotify_url || p.spotifyUrl || '',
+              audiomack_url: p.audiomack_url || p.audiomackUrl || '',
+              apple_music_url: p.apple_music_url || p.appleMusicUrl || '',
+              instagram_url: p.instagram_url || p.instagramUrl || ''
+            };
+            fetchedPosts.push(normalizedPost);
           }
         });
       }
