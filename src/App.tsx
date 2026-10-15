@@ -956,6 +956,7 @@ export default function App() {
   const [featuredArtist, setFeaturedArtist] = useState('');
   const [category, setCategory] = useState<'MUSIC' | 'VIDEOS' | 'NEWS' | 'AMAPIANO'>('MUSIC');
   const [coverFile, setCoverFile] = useState<File | null>(null);
+  const [middleImageFile, setMiddleImageFile] = useState<File | null>(null);
   const [coverPreview, setCoverPreview] = useState('');
   const [audioFile, setAudioFile] = useState<File | null>(null);
   const [videoFile, setVideoFile] = useState<File | null>(null);
@@ -1454,6 +1455,17 @@ export default function App() {
         }
       }
 
+      // Upload middle image if middleImageFile exists
+      let finalMiddleImageUrl = middleImageUrl;
+      if (middleImageFile) {
+        setStatusMessage('Uploading middle image...');
+        const { data, error } = await supabase.storage.from('cover_art').upload(`${Date.now()}_${middleImageFile.name}`, middleImageFile);
+        if (data) {
+          const { data: publicUrlData } = supabase.storage.from('cover_art').getPublicUrl(data.path);
+          finalMiddleImageUrl = publicUrlData.publicUrl;
+        }
+      }
+
       const postData = {
         title: title,
         artist: artist || 'HD Sounz',
@@ -1465,7 +1477,7 @@ export default function App() {
         body: content,
         content: content,
         imageUrl: finalImageUrl,
-        middle_image_url: middleImageUrl
+        middle_image_url: finalMiddleImageUrl
       };
 
       let result;
@@ -2221,15 +2233,21 @@ export default function App() {
                             </div>
                           </div>
 
-                          {/* Middle Image Uploader */}
-                          <div className="bg-stone-950 border border-stone-800 p-4 rounded-xl space-y-2">
+                           {/* Middle Image Uploader */}
+                          <div className="bg-stone-950 border border-stone-800 p-4 rounded-xl text-center space-y-3">
                              <label className="block text-xs font-bold text-stone-300">Middle Post Image (Optional)</label>
                              <input
                                type="text"
                                placeholder="Image URL"
                                value={middleImageUrl}
                                onChange={(e) => setMiddleImageUrl(e.target.value)}
-                               className="w-full bg-stone-900 border border-stone-800 rounded-xl px-4 py-2.5 text-xs text-stone-100 focus:outline-none focus:border-amber-500"
+                               className="w-full bg-stone-900 border border-stone-800 rounded-xl px-4 py-2.5 text-xs text-stone-100"
+                             />
+                             <input
+                               type="file"
+                               accept="image/*"
+                               onChange={(e) => handleFileChange(e, 'uform', 'middle')}
+                               className="w-full text-xs text-stone-400"
                              />
                            </div>
                            
@@ -2240,20 +2258,36 @@ export default function App() {
                              </div>
                            )}
 
-                           <button
-                             type="submit"
-                             disabled={isPublishingPost}
-                             className="w-full bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 disabled:opacity-60 disabled:cursor-not-allowed text-stone-950 font-bold py-3.5 rounded-xl shadow-lg transition-all flex items-center justify-center gap-2"
-                           >
-                             {isPublishingPost ? (
-                               <>
-                                 <span className="w-4 h-4 border-2 border-stone-950 border-t-transparent rounded-full animate-spin"></span>
-                                 <span>{editingPostId ? 'Updating...' : 'Publishing...'}</span>
-                               </>
-                             ) : (
-                               <span>{editingPostId ? 'Update Post' : 'Publish New Post'}</span>
+                           <div className="flex gap-2">
+                             {editingPostId && (
+                               <button
+                                 type="button"
+                                 onClick={() => {
+                                     setEditingPostId(null);
+                                     setTitle(''); setArtist(''); setFeaturedArtist(''); setContent('');
+                                     setImageUrl(''); setMiddleImageUrl(''); setAudioUrl(''); setYoutubeUrl('');
+                                     setCoverFile(null); setMiddleImageFile(null);
+                                 }}
+                                 className="flex-1 bg-stone-800 hover:bg-stone-700 text-white font-bold py-3.5 rounded-xl shadow-lg transition-all"
+                               >
+                                 Cancel Edit
+                               </button>
                              )}
-                           </button>
+                             <button
+                               type="submit"
+                               disabled={isPublishingPost}
+                               className="flex-1 bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 disabled:opacity-60 disabled:cursor-not-allowed text-stone-950 font-bold py-3.5 rounded-xl shadow-lg transition-all flex items-center justify-center gap-2"
+                             >
+                               {isPublishingPost ? (
+                                 <>
+                                   <span className="w-4 h-4 border-2 border-stone-950 border-t-transparent rounded-full animate-spin"></span>
+                                   <span>{editingPostId ? 'Updating...' : 'Publishing...'}</span>
+                                 </>
+                               ) : (
+                                 <span>{editingPostId ? 'Update Post' : 'Publish New Post'}</span>
+                               )}
+                             </button>
+                           </div>
                         </form>
 
                         {/* Fixed Content Manager Table */}
