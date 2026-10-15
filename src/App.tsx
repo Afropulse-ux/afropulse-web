@@ -951,28 +951,27 @@ export default function App() {
   // Admin Uploader Form State (Direct File Pickers)
   const [isPublishingPost, setIsPublishingPost] = useState(false);
   const [statusMessage, setStatusMessage] = useState('');
-  const [uform, setUform] = useState({
-    title: '',
-    mainArtist: '',
-    subtitle: '',
-    category: 'MUSIC' as 'MUSIC' | 'VIDEOS' | 'NEWS' | 'AMAPIANO',
-    coverFile: null as File | null,
-    coverPreview: '',
-    audioFile: null as File | null,
-    videoFile: null as File | null,
-    youtubeUrl: '',
-    body: '',
-    lyrics: '',
-    spotify: '',
-    tiktok: '',
-    instagram: '',
-    twitter: '',
-    youtubeChannel: '',
-    isHero: false,
-    uploadType: 'SINGLE' as 'SINGLE' | 'EP_ALBUM',
-    epDescription: '',
-    driveAudioLink: ''
-  });
+  const [title, setTitle] = useState('');
+  const [artist, setArtist] = useState('');
+  const [featuredArtist, setFeaturedArtist] = useState('');
+  const [category, setCategory] = useState<'MUSIC' | 'VIDEOS' | 'NEWS' | 'AMAPIANO'>('MUSIC');
+  const [coverFile, setCoverFile] = useState<File | null>(null);
+  const [coverPreview, setCoverPreview] = useState('');
+  const [audioFile, setAudioFile] = useState<File | null>(null);
+  const [videoFile, setVideoFile] = useState<File | null>(null);
+  const [youtubeUrl, setYoutubeUrl] = useState('');
+  const [body, setBody] = useState('');
+  const [lyrics, setLyrics] = useState('');
+  const [spotify, setSpotify] = useState('');
+  const [tiktok, setTiktok] = useState('');
+  const [instagram, setInstagram] = useState('');
+  const [twitter, setTwitter] = useState('');
+  const [youtubeChannel, setYoutubeChannel] = useState('');
+  const [isHero, setIsHero] = useState(false);
+  const [uploadType, setUploadType] = useState<'SINGLE' | 'EP_ALBUM'>('SINGLE');
+  const [epDescription, setEpDescription] = useState('');
+  const [driveAudioLink, setDriveAudioLink] = useState('');
+  const [uform, setUform] = useState({ /* keeping for other fields */ });
 
   // Admin Beat Uploader State
   const [bform, setBform] = useState({
@@ -1403,9 +1402,9 @@ export default function App() {
     if (!file) return;
     const previewUrl = URL.createObjectURL(file);
     if (field === 'uform') {
-      if (type === 'cover') setUform(prev => ({ ...prev, coverFile: file, coverPreview: previewUrl }));
-      if (type === 'audio') setUform(prev => ({ ...prev, audioFile: file }));
-      if (type === 'video') setUform(prev => ({ ...prev, videoFile: file }));
+      if (type === 'cover') { setCoverFile(file); setCoverPreview(previewUrl); }
+      if (type === 'audio') setAudioFile(file);
+      if (type === 'video') setVideoFile(file);
     } else if (field === 'bform') {
       if (type === 'cover') setBform(prev => ({ ...prev, coverFile: file, coverPreview: previewUrl }));
       if (type === 'preview') setBform(prev => ({ ...prev, previewFile: file }));
@@ -1420,7 +1419,7 @@ export default function App() {
 
   const handlePublishPost = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!uform.title) {
+    if (!title) {
       alert('Please enter a title');
       return;
     }
@@ -1428,7 +1427,7 @@ export default function App() {
     setIsPublishingPost(true);
     setStatusMessage('Starting publish...');
 
-    const rawCat = (uform.category || 'music').toLowerCase().trim();
+    const rawCat = (category || 'music').toLowerCase().trim();
     let catNormalized = 'audio';
     if (rawCat === 'video' || rawCat === 'videos' || rawCat === 'movie' || rawCat === 'movies') {
       catNormalized = 'movie';
@@ -1441,21 +1440,19 @@ export default function App() {
     }
 
     const postData = {
-      title: uform.title,
-      artist: uform.mainArtist,
-      mainArtist: uform.mainArtist,
-      featured_artist: uform.subtitle,
-      featuring: uform.subtitle,
-      genre: uform.category,
+      title: title,
+      artist: artist || 'HD Sounz',
+      featured_artist: featuredArtist || '',
+      genre: category,
       category: catNormalized,
-      audioLink: uform.driveAudioLink,
-      videoLink: uform.youtubeUrl,
-      body: uform.body,
-      content: uform.body,
-      imageUrl: uform.coverPreview
+      audioLink: driveAudioLink,
+      videoLink: youtubeUrl,
+      body: body,
+      content: body,
+      imageUrl: coverPreview
     };
 
-    const result = await handlePublishWithStatus(postData, uform.coverFile, uform.audioFile, setStatusMessage);
+    const result = await handlePublishWithStatus(postData, coverFile, audioFile, setStatusMessage);
     setIsPublishingPost(false);
 
     if (result.success) {
@@ -1989,8 +1986,8 @@ export default function App() {
                               <input
                                 type="text"
                                 required
-                                value={uform.title}
-                                onChange={(e) => setUform({ ...uform, title: e.target.value })}
+                                value={title}
+                                onChange={(e) => setTitle(e.target.value)}
                                 placeholder="e.g. Omo Ologo"
                                 className="w-full bg-stone-950 border border-stone-800 rounded-xl px-4 py-2.5 text-sm text-stone-100 focus:outline-none focus:border-amber-500"
                               />
@@ -1999,8 +1996,8 @@ export default function App() {
                               <label className="block text-xs font-semibold text-stone-300 mb-1">Main Artist Name</label>
                               <input
                                 type="text"
-                                value={uform.mainArtist}
-                                onChange={(e) => setUform({ ...uform, mainArtist: e.target.value })}
+                                value={artist}
+                                onChange={(e) => setArtist(e.target.value)}
                                 placeholder="e.g. Asake / Rema / Burna Boy"
                                 className="w-full bg-stone-950 border border-stone-800 rounded-xl px-4 py-2.5 text-sm text-stone-100 focus:outline-none focus:border-amber-500"
                               />
@@ -2008,8 +2005,8 @@ export default function App() {
                             <div>
                               <label className="block text-xs font-semibold text-stone-300 mb-1">Upload Type</label>
                               <select
-                                value={uform.uploadType}
-                                onChange={(e) => setUform({ ...uform, uploadType: e.target.value as 'SINGLE' | 'EP_ALBUM' })}
+                                value={uploadType}
+                                onChange={(e) => setUploadType(e.target.value as 'SINGLE' | 'EP_ALBUM')}
                                 className="w-full bg-stone-950 border border-stone-800 rounded-xl px-4 py-2.5 text-sm text-stone-100 focus:outline-none focus:border-amber-500"
                               >
                                 <option value="SINGLE">Single Track</option>
@@ -2018,12 +2015,12 @@ export default function App() {
                             </div>
                           </div>
 
-                          {uform.uploadType === 'EP_ALBUM' && (
+                          {uploadType === 'EP_ALBUM' && (
                             <div>
                               <label className="block text-xs font-semibold text-stone-300 mb-1">EP Description / Tracklist</label>
                               <textarea
-                                value={uform.epDescription}
-                                onChange={(e) => setUform({ ...uform, epDescription: e.target.value })}
+                                value={epDescription}
+                                onChange={(e) => setEpDescription(e.target.value)}
                                 placeholder="Enter EP tracklist or description..."
                                 className="w-full bg-stone-950 border border-stone-800 rounded-xl px-4 py-2.5 text-sm text-stone-100 focus:outline-none focus:border-amber-500"
                                 rows={3}
@@ -2034,8 +2031,8 @@ export default function App() {
                               <label className="block text-xs font-semibold text-stone-300 mb-1">Featured Artist(s) / Subtitle</label>
                               <input
                                 type="text"
-                                value={uform.subtitle}
-                                onChange={(e) => setUform({ ...uform, subtitle: e.target.value })}
+                                value={featuredArtist}
+                                onChange={(e) => setFeaturedArtist(e.target.value)}
                                 placeholder="e.g. ft. Burna Boy & Tyla"
                                 className="w-full bg-stone-950 border border-stone-800 rounded-xl px-4 py-2.5 text-sm text-stone-100 focus:outline-none focus:border-amber-500"
                               />
@@ -2046,8 +2043,8 @@ export default function App() {
                             <div>
                               <label className="block text-xs font-semibold text-stone-300 mb-1">Category / Post Type</label>
                               <select
-                                value={uform.category}
-                                onChange={(e) => setUform({ ...uform, category: e.target.value as any })}
+                                value={category}
+                                onChange={(e) => setCategory(e.target.value as any)}
                                 className="w-full bg-stone-950 border border-stone-800 rounded-xl px-4 py-2.5 text-sm text-stone-100 focus:outline-none focus:border-amber-500"
                               >
                                 <option value="MUSIC">Music Single Drop</option>
