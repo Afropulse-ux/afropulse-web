@@ -1445,11 +1445,11 @@ export default function App() {
       featured_artist: featuredArtist || '',
       genre: category,
       category: catNormalized,
-      audioLink: driveAudioLink,
-      videoLink: youtubeUrl,
-      body: body,
-      content: body,
-      imageUrl: coverPreview
+      audioLink: driveAudioLink || audioUrl,
+      videoLink: youtubeUrl || videoUrl,
+      body: content,
+      content: content,
+      imageUrl: imageUrl || coverPreview
     };
 
     const result = await handlePublishWithStatus(postData, coverFile, audioFile, setStatusMessage);
@@ -2058,8 +2058,8 @@ export default function App() {
                               <input
                                 type="checkbox"
                                 id="heroToggle"
-                                checked={uform.isHero}
-                                onChange={(e) => setUform({ ...uform, isHero: e.target.checked })}
+                                checked={isHero}
+                                onChange={(e) => setIsHero(e.target.checked)}
                                 className="w-4 h-4 accent-amber-500 rounded"
                               />
                               <label htmlFor="heroToggle" className="text-xs font-semibold text-amber-400">
