@@ -1402,7 +1402,7 @@ export default function App() {
     if (!file) return;
     const previewUrl = URL.createObjectURL(file);
     if (field === 'uform') {
-      if (type === 'cover') { setCoverFile(file); setCoverPreview(previewUrl); }
+      if (type === 'cover') { setCoverFile(file); setImageUrl(previewUrl); }
       if (type === 'audio') setAudioFile(file);
       if (type === 'video') setVideoFile(file);
     } else if (field === 'bform') {
@@ -1439,6 +1439,17 @@ export default function App() {
       catNormalized = 'audio';
     }
 
+    // Upload image if coverFile exists
+    let finalImageUrl = imageUrl;
+    if (coverFile) {
+        setStatusMessage('Uploading cover art...');
+        const { data, error } = await supabase.storage.from('cover_art').upload(`${Date.now()}_${coverFile.name}`, coverFile);
+        if (data) {
+            const { data: publicUrlData } = supabase.storage.from('cover_art').getPublicUrl(data.path);
+            finalImageUrl = publicUrlData.publicUrl;
+        }
+    }
+
     const postData = {
       title: title,
       artist: artist || 'HD Sounz',
@@ -1449,7 +1460,7 @@ export default function App() {
       videoLink: youtubeUrl || videoUrl,
       body: content,
       content: content,
-      imageUrl: imageUrl || coverPreview
+      imageUrl: finalImageUrl
     };
 
     const result = await handlePublishWithStatus(postData, coverFile, audioFile, setStatusMessage);
@@ -1457,28 +1468,16 @@ export default function App() {
 
     if (result.success) {
       alert('Post Published Successfully!');
-      setUform({
-        title: '',
-        mainArtist: '',
-        subtitle: '',
-        category: 'MUSIC',
-        coverFile: null,
-        coverPreview: '',
-        audioFile: null,
-        videoFile: null,
-        youtubeUrl: '',
-        body: '',
-        lyrics: '',
-        spotify: '',
-        tiktok: '',
-        instagram: '',
-        twitter: '',
-        youtubeChannel: '',
-        isHero: false,
-        uploadType: 'SINGLE',
-        epDescription: '',
-        driveAudioLink: ''
-      });
+      alert('Post Published Successfully!');
+      setTitle('');
+      setArtist('');
+      setFeaturedArtist('');
+      setContent('');
+      setImageUrl('');
+      setAudioUrl('');
+      setYoutubeUrl('');
+      setCoverFile(null);
+      setAudioFile(null);
       await fetchAllSupabaseContent();
       await refreshAdminContent();
     }
