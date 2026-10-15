@@ -224,26 +224,64 @@ export async function handlePublishWithStatus(postData: any, imageFile: File | n
     }
 
     setStatusMessage('Saving post to database...');
-    const payload = {
+    const cat = (postData.category || 'music').toLowerCase().trim();
+    const finalAudio = audioUrl || postData.audioLink || null;
+    const finalImage = imageUrl || postData.imageUrl || null;
+
+    const fullPayload: any = {
       title: postData.title,
-      main_artist: postData.mainArtist,
-      featuring: postData.featuring,
-      genre: postData.genre,
-      category: postData.category || 'general',
-      image_url: imageUrl || postData.imageUrl || null,
-      audio_link: audioUrl || postData.audioLink || null,
-      video_link: postData.videoLink,
-      content: postData.body || '',
+      artist: postData.mainArtist || postData.artist || '',
+      main_artist: postData.mainArtist || postData.artist || '',
+      subtitle: postData.featuring || postData.subtitle || '',
+      featuring: postData.featuring || postData.subtitle || '',
+      genre: postData.genre || cat,
+      category: cat,
+      image_url: finalImage,
+      cover_url: finalImage,
+      audio_url: finalAudio,
+      audio_link: finalAudio,
+      video_url: postData.videoLink || null,
+      video_link: postData.videoLink || null,
+      content: postData.body || postData.content || '',
       created_at: new Date().toISOString()
     };
 
-    const { data, error } = await supabase
+    let { data, error } = await supabase
       .from('posts')
-      .insert([payload])
+      .insert([fullPayload])
       .select();
 
     if (error) {
-      throw new Error(`Database Error [${error.code}]: ${error.message}`);
+      console.warn('Full payload insert notice, trying standard columns:', error.message);
+      // Fallback to standard Supabase posts schema columns
+      const standardPayload: any = {
+        title: postData.title,
+        content: postData.body || postData.content || '',
+        category: cat,
+        image_url: finalImage,
+        created_at: new Date().toISOString()
+      };
+      if (postData.mainArtist) standardPayload.artist = postData.mainArtist;
+      if (finalAudio) standardPayload.audio_url = finalAudio;
+      
+      const retry = await supabase.from('posts').insert([standardPayload]).select();
+      if (retry.error) {
+        // Last fallback: core guaranteed 5 columns
+        const corePayload = {
+          title: postData.title,
+          content: postData.body || postData.content || '',
+          category: cat,
+          image_url: finalImage,
+          created_at: new Date().toISOString()
+        };
+        const coreRetry = await supabase.from('posts').insert([corePayload]).select();
+        if (coreRetry.error) {
+          throw new Error(`Database Error [${coreRetry.error.code}]: ${coreRetry.error.message}`);
+        }
+        data = coreRetry.data;
+      } else {
+        data = retry.data;
+      }
     }
 
     setStatusMessage('Success! Post published to Supabase.');

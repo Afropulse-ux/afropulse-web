@@ -74,8 +74,10 @@ interface PostItem {
   id: string;
   title: string;
   subtitle: string;
-  category: 'MUSIC' | 'VIDEOS' | 'NEWS' | 'AMAPIANO' | 'BEAT';
+  artist: string;
+  category: string;
   cover: string;
+  image_url: string;
   date: string;
   duration?: string;
   downloads?: string;
@@ -83,9 +85,15 @@ interface PostItem {
   reads?: string;
   readTime?: string;
   body: string;
+  content: string;
+  description?: string;
   lyrics?: string[];
   audioUrl?: string;
+  audio_url?: string;
+  audio_link?: string;
   videoUrl?: string;
+  video_url?: string;
+  video_link?: string;
   isHero?: boolean;
   socials?: {
     spotify?: string;
@@ -95,6 +103,40 @@ interface PostItem {
     youtube?: string;
   };
 }
+
+// STRICT SECTION & CATEGORY FILTERING HELPERS:
+// 1. Music/Audio: category 'audio' or 'music' ONLY render inside Music/Audio section feed
+export const isMusicPost = (p: { category?: string; audio_url?: string; audioUrl?: string; video_url?: string; videoUrl?: string }) => {
+  const cat = (p.category || '').toLowerCase().trim();
+  // Ensure NO video, movie, beats, or news posts are considered music
+  if (['movie', 'movies', 'video', 'videos', 'movie_premiere', 'news', 'gossip', 'beats', 'beat'].includes(cat)) {
+    return false;
+  }
+  return cat === 'audio' || cat === 'music' || cat === 'amapiano' || cat === 'general' || !cat;
+};
+
+// 2. Movie/Video: category 'video' or 'movie' must ONLY render inside Movie section feed.
+// Ensure NO audio posts leak into the Movie section.
+export const isMoviePost = (p: { category?: string; audio_url?: string; audioUrl?: string; video_url?: string; videoUrl?: string }) => {
+  const cat = (p.category || '').toLowerCase().trim();
+  // Strict exclusion: never allow audio or music posts to leak into movie/video feeds
+  if (cat === 'audio' || cat === 'music' || cat === 'amapiano') {
+    return false;
+  }
+  return cat === 'video' || cat === 'videos' || cat === 'movie' || cat === 'movies' || cat === 'movie_premiere';
+};
+
+// 3. Beats: category 'beats' must ONLY render inside Beats section feed
+export const isBeatsPost = (p: { category?: string }) => {
+  const cat = (p.category || '').toLowerCase().trim();
+  return cat === 'beats' || cat === 'beat';
+};
+
+// 4. News: category 'news' must ONLY render inside News section feed
+export const isNewsPost = (p: { category?: string }) => {
+  const cat = (p.category || '').toLowerCase().trim();
+  return cat === 'news' || cat === 'gossip';
+};
 
 interface BeatItem {
   id: string;
@@ -624,22 +666,24 @@ export default function App() {
       // 1. Process posts table records
       if (postsRes.status === 'fulfilled' && postsRes.value && Array.isArray((postsRes.value as any).data)) {
         (postsRes.value as any).data.forEach((p: any) => {
-          const cat = (p.category || '').toUpperCase();
-          if (cat === 'BEATS' || p.track_type === 'beat') {
+          const rawCat = (p.category || '').toLowerCase().trim();
+          if (rawCat === 'beats' || rawCat === 'beat' || p.track_type === 'beat') {
             const beatId = p.id?.toString() || `b-${Date.now()}`;
             const beatTitle = (p.title || 'Untitled Beat').toLowerCase().trim();
             if (!seenBeatIds.has(beatId) && !seenBeatTitles.has(beatTitle)) {
               seenBeatIds.add(beatId);
               seenBeatTitles.add(beatTitle);
+              const beatImg = p.image_url || p.cover_url || p.cover || 'https://images.unsplash.com/photo-1598488035139-bdbb2231ce04?auto=format&fit=crop&w=800&q=80';
+              const beatAudio = p.audio_url || p.audio_link || p.audioUrl || p.preview_url || 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-3.mp3';
               fetchedBeats.push({
                 id: beatId,
                 title: p.title || 'Untitled Beat',
-                producer: p.producer || p.artist || p.subtitle || 'AfroPulse Producer',
+                producer: p.artist || p.main_artist || p.producer || p.subtitle || 'AfroPulse Producer',
                 bpm: Number(p.bpm) || 120,
                 key: p.key || 'Am',
                 genre: p.genre || 'Afrobeat',
-                cover: p.cover || p.cover_url || 'https://images.unsplash.com/photo-1598488035139-bdbb2231ce04?auto=format&fit=crop&w=800&q=80',
-                previewUrl: p.audio_url || p.audioUrl || p.preview_url || 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-3.mp3',
+                cover: beatImg,
+                previewUrl: beatAudio,
                 prices: {
                   mp3: Number(p.price_mp3) || 35000,
                   wav: Number(p.price_wav) || 70000,
@@ -654,20 +698,60 @@ export default function App() {
             if (!seenPostIds.has(postId) && !seenPostTitles.has(postTitle)) {
               seenPostIds.add(postId);
               seenPostTitles.add(postTitle);
+              
+              // 1. Artwork mapping: explicitly prioritize image_url
+              const imgUrl = p.image_url || p.cover_url || p.cover || '';
+              // 2. Audio mapping: explicitly prioritize audio_url or audio_link
+              const audUrl = p.audio_url || p.audio_link || p.audioUrl || '';
+              // 3. Video mapping
+              const vidUrl = p.video_url || p.video_link || p.videoUrl || '';
+              // 4. Artist mapping: explicitly prioritize artist or main_artist
+              const artistName = p.artist || p.main_artist || p.subtitle || 'AfroPulse Artist';
+              // 5. Content / Description mapping
+              const postBody = p.content || p.body || p.description || 'Exclusive release on AfroPulse.';
+
+              // Strict Category Assignment:
+              // - category 'audio' or 'music' ONLY render inside Music/Audio section feed
+              // - category 'video' or 'movie' must ONLY render inside Movie section feed
+              // - category 'beats' must ONLY render inside Beats section feed
+              // - category 'news' must ONLY render inside News section feed
+              let finalCat = 'music';
+              if (rawCat === 'video' || rawCat === 'videos' || rawCat === 'movie' || rawCat === 'movies' || rawCat === 'movie_premiere') {
+                finalCat = 'movie';
+              } else if (rawCat === 'news' || rawCat === 'gossip') {
+                finalCat = 'news';
+              } else if (rawCat === 'beats' || rawCat === 'beat') {
+                finalCat = 'beats';
+              } else if (rawCat === 'audio' || rawCat === 'music' || rawCat === 'amapiano') {
+                finalCat = 'music';
+              } else if (vidUrl && !audUrl) {
+                finalCat = 'movie';
+              } else {
+                finalCat = 'music';
+              }
+
               fetchedPosts.push({
                 id: postId,
                 title: p.title || 'Untitled Post',
-                subtitle: p.subtitle || p.artist || 'AfroPulse Exclusive',
-                category: (p.category?.toUpperCase() as any) || (p.genre?.toLowerCase().includes('amapiano') ? 'AMAPIANO' : 'MUSIC'),
-                cover: p.image_url || p.cover || p.cover_url || 'https://images.unsplash.com/photo-1514525253161-7a46d19cd819?auto=format&fit=crop&w=800&q=80',
+                artist: artistName,
+                subtitle: artistName,
+                category: finalCat,
+                image_url: imgUrl,
+                cover: imgUrl || 'https://images.unsplash.com/photo-1514525253161-7a46d19cd819?auto=format&fit=crop&w=800&q=80',
                 date: p.created_at ? new Date(p.created_at).toLocaleDateString() : (p.date || 'Just now'),
                 duration: p.duration || '03:30',
                 downloads: p.downloads || '1.2K',
-                views: p.views,
-                body: p.content || p.body || p.description || 'Exclusive release on AfroPulse.',
+                views: p.views || '14.2K',
+                body: postBody,
+                content: postBody,
+                description: postBody,
                 lyrics: Array.isArray(p.lyrics) ? p.lyrics : (typeof p.lyrics === 'string' ? p.lyrics.split('\n') : undefined),
-                audioUrl: p.audio_url || p.audioUrl || '',
-                videoUrl: p.video_url || p.videoUrl || '',
+                audioUrl: audUrl,
+                audio_url: audUrl,
+                audio_link: audUrl,
+                videoUrl: vidUrl,
+                video_url: vidUrl,
+                video_link: vidUrl,
                 isHero: Boolean(p.is_hero || p.isHero),
                 socials: {
                   spotify: p.spotify || '',
@@ -691,6 +775,8 @@ export default function App() {
             if (!seenBeatIds.has(beatId) && !seenBeatTitles.has(beatTitle)) {
               seenBeatIds.add(beatId);
               seenBeatTitles.add(beatTitle);
+              const beatCover = m.image_url || m.cover_url || m.cover || 'https://images.unsplash.com/photo-1598488035139-bdbb2231ce04?auto=format&fit=crop&w=800&q=80';
+              const beatAudio = m.audio_url || m.audio_link || m.preview_url || 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-3.mp3';
               fetchedBeats.push({
                 id: beatId,
                 title: m.title || 'Untitled Beat',
@@ -698,8 +784,8 @@ export default function App() {
                 bpm: m.bpm || 115,
                 key: m.key || 'Am',
                 genre: m.genre || 'Afrobeat',
-                cover: m.cover_url || 'https://images.unsplash.com/photo-1598488035139-bdbb2231ce04?auto=format&fit=crop&w=800&q=80',
-                previewUrl: m.audio_url || 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-3.mp3',
+                cover: beatCover,
+                previewUrl: beatAudio,
                 prices: {
                   mp3: m.price_mp3 || 35000,
                   wav: m.price_wav || 70000,
@@ -714,17 +800,30 @@ export default function App() {
             if (!seenPostIds.has(postId) && !seenPostTitles.has(postTitle)) {
               seenPostIds.add(postId);
               seenPostTitles.add(postTitle);
+              const imgUrl = m.image_url || m.cover_url || m.cover || '';
+              const audUrl = m.audio_url || m.audio_link || '';
+              const artistName = m.artist || 'AfroPulse Artist';
+              const desc = m.description || m.content || m.body || 'Exclusive release on AfroPulse.';
               fetchedPosts.push({
                 id: postId,
                 title: m.title || 'Untitled Track',
-                subtitle: m.artist || 'AfroPulse Artist',
-                category: m.genre?.toLowerCase().includes('amapiano') ? 'AMAPIANO' : 'MUSIC',
-                cover: m.cover_url || 'https://images.unsplash.com/photo-1514525253161-7a46d19cd819?auto=format&fit=crop&w=800&q=80',
+                artist: artistName,
+                subtitle: artistName,
+                category: 'music',
+                image_url: imgUrl,
+                cover: imgUrl || 'https://images.unsplash.com/photo-1514525253161-7a46d19cd819?auto=format&fit=crop&w=800&q=80',
                 date: m.created_at ? new Date(m.created_at).toLocaleDateString() : 'Just now',
                 duration: '03:30',
                 downloads: '1.2K',
-                body: m.description || 'Exclusive release on AfroPulse.',
-                audioUrl: m.audio_url || '',
+                views: '14.2K',
+                body: desc,
+                content: desc,
+                description: desc,
+                audioUrl: audUrl,
+                audio_url: audUrl,
+                audio_link: audUrl,
+                videoUrl: '',
+                video_url: '',
                 isHero: Boolean(m.is_hero || m.is_featured)
               });
             }
@@ -732,7 +831,7 @@ export default function App() {
         });
       }
 
-      // 3. Process video table records
+      // 3. Process video table records (Strictly Movie/Video category; NO audioUrl so it never leaks into audio/music)
       if (videoRes.status === 'fulfilled' && Array.isArray(videoRes.value)) {
         videoRes.value.forEach((v: any) => {
           const vidId = `v-${v.id}`;
@@ -740,18 +839,28 @@ export default function App() {
           if (!seenPostIds.has(vidId) && !seenPostTitles.has(vidTitle)) {
             seenPostIds.add(vidId);
             seenPostTitles.add(vidTitle);
+            const imgUrl = v.image_url || v.thumbnail_url || v.cover_url || '';
+            const vidUrl = v.youtube_url || v.video_url || '';
+            const artistName = v.artist || 'AfroPulse Video';
+            const desc = v.description || v.content || 'Official video premiere on AfroPulse.';
             fetchedPosts.push({
               id: vidId,
               title: v.title || 'Untitled Video',
-              subtitle: v.artist || 'AfroPulse Video',
-              category: v.category === 'movie_premiere' ? 'MOVIES' : (v.category === 'news' ? 'NEWS' : 'VIDEOS'),
-              cover: v.thumbnail_url || 'https://images.unsplash.com/photo-1574717024653-61fd2cf4d44d?auto=format&fit=crop&w=800&q=80',
+              artist: artistName,
+              subtitle: artistName,
+              category: 'movie', // Strictly movie category so it never leaks into music
+              image_url: imgUrl,
+              cover: imgUrl || 'https://images.unsplash.com/photo-1574717024653-61fd2cf4d44d?auto=format&fit=crop&w=800&q=80',
               date: v.created_at ? new Date(v.created_at).toLocaleDateString() : 'Just now',
               duration: '03:45',
               views: '45K views',
-              body: v.description || 'Official video premiere on AfroPulse.',
-              videoUrl: v.youtube_url || v.video_url || '',
-              audioUrl: v.video_url || ''
+              body: desc,
+              content: desc,
+              description: desc,
+              videoUrl: vidUrl,
+              video_url: vidUrl,
+              audioUrl: '', // strictly no audioUrl on video/movie records
+              audio_url: ''
             });
           }
         });
@@ -828,7 +937,11 @@ export default function App() {
   };
 
   const handleDownloadFile = async (item: any) => {
-    const url = item.audioUrl || item.mediaUrl || item.previewUrl || item.audio_url || 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-3.mp3';
+    const url = item.audio_url || item.audioUrl || item.audio_link || item.mediaUrl || item.previewUrl;
+    if (!url) {
+      alert(`No download link available for "${item?.title || 'this track'}".`);
+      return;
+    }
     try {
       const response = await fetch(url);
       const blob = await response.blob();
@@ -1282,7 +1395,7 @@ export default function App() {
   // Helper for playing tracks
   const handlePlayTrack = (track: PostItem | null | undefined) => {
     if (!track) return;
-    const audioSrc = track.audioUrl || (track as any).mediaUrl || (track as any).previewUrl;
+    const audioSrc = track.audio_url || track.audioUrl || (track as any).audio_link || (track as any).mediaUrl || (track as any).previewUrl;
     if (!audioSrc) {
       alert(`No streaming audio link available for "${track.title || 'this track'}".`);
       return;
@@ -1507,7 +1620,7 @@ export default function App() {
   };
 
   const flagshipTrack = (posts && posts.length > 0)
-    ? (posts.find(p => p.id === featuredTrackId) || posts[0])
+    ? (posts.find(p => p.id === featuredTrackId && isMusicPost(p)) || posts.find(p => p.isHero && isMusicPost(p)) || posts.find(isMusicPost) || posts[0])
     : null;
 
   return (
@@ -2813,7 +2926,7 @@ export default function App() {
                       onClick={() => { setSelectedPostId(flagshipTrack.id); setCurrentRoute('post'); }}
                       className="w-32 h-32 md:w-44 md:h-44 shrink-0 rounded-xl overflow-hidden relative shadow-xl border border-stone-700 cursor-pointer group"
                     >
-                      <img src={flagshipTrack.cover} alt="" className="w-full h-full object-cover group-hover:scale-105 transition-transform" />
+                      <img src={flagshipTrack.image_url || flagshipTrack.cover} alt={flagshipTrack.title} className="w-full h-full object-cover group-hover:scale-105 transition-transform" />
                       <div className="absolute inset-0 bg-black/20 flex items-center justify-center">
                         <button
                           onClick={(e) => { e.stopPropagation(); handlePlayTrack(flagshipTrack); }}
@@ -2836,8 +2949,8 @@ export default function App() {
                       >
                         {flagshipTrack.title}
                       </h2>
-                      <p className="text-sm font-semibold text-amber-400">{flagshipTrack.subtitle}</p>
-                      <p className="text-xs text-stone-300 line-clamp-2 max-w-2xl">{flagshipTrack.body}</p>
+                      <p className="text-sm font-semibold text-amber-400">{flagshipTrack.artist || flagshipTrack.subtitle}</p>
+                      <p className="text-xs text-stone-300 line-clamp-2 max-w-2xl" style={{ whiteSpace: 'pre-wrap' }}>{flagshipTrack.content || flagshipTrack.body}</p>
                       <div className="flex flex-wrap items-center justify-center md:justify-start gap-3 pt-2">
                         <button
                           onClick={() => handlePlayTrack(flagshipTrack)}
@@ -2846,7 +2959,7 @@ export default function App() {
                           {isPlaying && currentPlayingTrack?.id === flagshipTrack.id ? <Pause className="w-4 h-4 fill-stone-950" /> : <Play className="w-4 h-4 fill-stone-950" />}
                           Stream / Play Audio
                         </button>
-                        {flagshipTrack.audioUrl && (
+                        {(flagshipTrack.audio_url || flagshipTrack.audioUrl) && (
                           <button
                             onClick={() => handleDownloadFile(flagshipTrack)}
                             className="bg-stone-800 hover:bg-stone-700 text-amber-400 font-bold px-4 py-2.5 rounded-xl text-xs flex items-center gap-2 transition-all border border-stone-700"
@@ -2903,6 +3016,7 @@ export default function App() {
 
                       <div className="space-y-3.5">
                         {posts
+                          .filter(p => !searchQuery || p.title.toLowerCase().includes(searchQuery.toLowerCase()) || (p.artist || p.subtitle || '').toLowerCase().includes(searchQuery.toLowerCase()))
                           .slice(0, visiblePostLimit)
                           .map(p => (
                             <div
@@ -2911,18 +3025,21 @@ export default function App() {
                               className="flex items-center gap-4 p-3.5 bg-stone-900/90 rounded-xl border border-stone-800/80 hover:border-amber-500/50 transition shadow-sm cursor-pointer"
                             >
                               <div className="w-20 h-20 shrink-0 rounded-lg overflow-hidden relative border border-stone-800">
-                                <img src={p.cover} alt="" className="w-full h-full object-cover" />
+                                <img src={p.image_url || p.cover} alt={p.title} className="w-full h-full object-cover" />
                               </div>
                               <div className="flex-1 min-w-0 space-y-1">
                                 <div className="flex items-center gap-2">
-                                  <span className={`px-2 py-0.5 rounded text-[9px] font-bold uppercase ${p.category === 'MUSIC' ? 'bg-emerald-500/20 text-emerald-400' : p.category === 'NEWS' ? 'bg-amber-500/20 text-amber-400' : 'bg-blue-500/20 text-blue-400'}`}>
-                                    {p.category}
+                                  <span className={`px-2 py-0.5 rounded text-[9px] font-bold uppercase ${isMusicPost(p) ? 'bg-emerald-500/20 text-emerald-400' : isNewsPost(p) ? 'bg-amber-500/20 text-amber-400' : 'bg-blue-500/20 text-blue-400'}`}>
+                                    {isMusicPost(p) ? 'MUSIC' : isNewsPost(p) ? 'NEWS' : 'MOVIE'}
                                   </span>
                                   <span className="text-[10px] text-stone-400">{p.date}</span>
-                                  <span className="text-[10px] text-stone-500">• {p.views || '12.4K'} views</span>
+                                  <span className="text-[10px] text-stone-500">• {p.downloads || p.views || '12.4K'} views</span>
                                 </div>
                                 <h4 className="text-sm md:text-base font-semibold text-white line-clamp-2 leading-snug">{p.title}</h4>
-                                <p className="text-xs text-stone-400 line-clamp-1">{p.subtitle} • {p.body}</p>
+                                <p className="text-xs text-stone-400 line-clamp-1">
+                                  <span className="text-amber-400 font-semibold">{p.artist || p.subtitle}</span>
+                                  {p.content || p.body ? ` • ${p.content || p.body}` : ''}
+                                </p>
                               </div>
                               <button
                                 onClick={(e) => { e.stopPropagation(); setSelectedPostId(p.id); setCurrentRoute('post'); }}
@@ -2952,53 +3069,61 @@ export default function App() {
                         <h3 className="text-lg font-black tracking-tight text-white flex items-center gap-2">
                           <Newspaper className="w-5 h-5 text-amber-500" /> Latest News & Gossip Archive
                         </h3>
-                        <button onClick={() => setActiveCategory('NEWS')} className="text-xs font-bold text-amber-400 hover:underline">Read More News →</button>
+                        <button onClick={() => { setActiveCategory('NEWS'); setCurrentRoute('news'); }} className="text-xs font-bold text-amber-400 hover:underline">Read More News →</button>
                       </div>
 
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         {posts
-                          .filter(p => p.category === 'NEWS' || p.category === 'ALL')
+                          .filter(isNewsPost)
                           .slice(0, 10)
                           .map(n => (
-                            <div key={n.id} className="bg-stone-900 border border-stone-800 rounded-xl p-4 flex gap-4 hover:border-amber-500/40 transition">
-                              <img src={n.cover} alt="" className="w-20 h-20 rounded-lg object-cover shrink-0" />
+                            <div
+                              key={n.id}
+                              onClick={() => { setSelectedPostId(n.id); setCurrentRoute('post'); }}
+                              className="bg-stone-900 border border-stone-800 rounded-xl p-4 flex gap-4 hover:border-amber-500/40 transition cursor-pointer"
+                            >
+                              <img src={n.image_url || n.cover} alt={n.title} className="w-20 h-20 rounded-lg object-cover shrink-0" />
                               <div className="flex-1 min-w-0 space-y-1">
                                 <span className="text-[9px] bg-amber-500/20 text-amber-400 font-bold px-2 py-0.5 rounded uppercase">Gossip</span>
                                 <h5 className="text-xs font-bold text-white line-clamp-2">{n.title}</h5>
-                                <p className="text-[11px] text-stone-400 line-clamp-2">{n.body}</p>
+                                <p className="text-[11px] text-stone-400 line-clamp-2" style={{ whiteSpace: 'pre-wrap' }}>{n.content || n.body}</p>
                               </div>
                             </div>
                           ))}
                       </div>
                     </div>
 
-                    {/* 8. MOVIES & MUSIC VIDEOS SECTION (10 recent video entries) */}
+                    {/* 8. MOVIES & MUSIC VIDEOS SECTION (Strictly Movie/Video category, NO audio posts) */}
                     <div className="space-y-4 pt-6">
                       <div className="flex items-center justify-between border-b border-stone-800 pb-3">
                         <h3 className="text-lg font-black tracking-tight text-white flex items-center gap-2">
                           <Video className="w-5 h-5 text-blue-400" /> Movies & Official Music Videos
                         </h3>
-                        <button onClick={() => setActiveCategory('VIDEOS')} className="text-xs font-bold text-blue-400 hover:underline">View More Videos →</button>
+                        <button onClick={() => { setActiveCategory('VIDEOS'); setCurrentRoute('movies'); }} className="text-xs font-bold text-blue-400 hover:underline">View More Movies →</button>
                       </div>
 
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         {posts
-                          .filter(p => p.category === 'VIDEOS' || p.category === 'MUSIC')
+                          .filter(isMoviePost)
                           .slice(0, 10)
                           .map(v => (
-                            <div key={v.id} className="bg-stone-900 border border-stone-800 rounded-xl overflow-hidden group">
+                            <div
+                              key={v.id}
+                              onClick={() => { setSelectedPostId(v.id); setCurrentRoute('post'); }}
+                              className="bg-stone-900 border border-stone-800 rounded-xl overflow-hidden group cursor-pointer hover:border-blue-500/40 transition"
+                            >
                               <div className="relative h-40 bg-stone-950 overflow-hidden">
-                                <img src={v.cover} alt="" className="w-full h-full object-cover group-hover:scale-105 transition duration-300" />
+                                <img src={v.image_url || v.cover} alt={v.title} className="w-full h-full object-cover group-hover:scale-105 transition duration-300" />
                                 <div className="absolute inset-0 bg-black/40 flex items-center justify-center">
-                                  <button onClick={() => handlePlayTrack(v)} className="w-12 h-12 rounded-full bg-amber-500 hover:bg-amber-400 text-stone-950 flex items-center justify-center shadow-lg transition-transform hover:scale-110">
-                                    <Play className="w-5 h-5 fill-stone-950 ml-0.5" />
+                                  <button onClick={(e) => { e.stopPropagation(); setSelectedPostId(v.id); setCurrentRoute('post'); }} className="w-12 h-12 rounded-full bg-blue-600 hover:bg-blue-500 text-white flex items-center justify-center shadow-lg transition-transform hover:scale-110">
+                                    <Play className="w-5 h-5 fill-white ml-0.5" />
                                   </button>
                                 </div>
                                 <span className="absolute bottom-2 left-2 px-2 py-0.5 bg-black/70 backdrop-blur text-[10px] font-bold text-white rounded">03:45</span>
                               </div>
                               <div className="p-4 space-y-1">
                                 <h5 className="text-xs font-bold text-white truncate">{v.title}</h5>
-                                <p className="text-[11px] text-stone-400 truncate">{v.subtitle}</p>
+                                <p className="text-[11px] text-stone-400 truncate">{v.artist || v.subtitle}</p>
                               </div>
                             </div>
                           ))}
@@ -3010,7 +3135,7 @@ export default function App() {
                   {/* RIGHT COLUMN: 5. TOP 10 TRENDING TRACKS & SIDENAV WIDGETS */}
                   <div className="space-y-6">
                     
-                    {/* 5. TOP 10 TRENDING TRACKS */}
+                    {/* 5. TOP 10 TRENDING TRACKS (Strictly music posts filtered and ordered properly) */}
                     <div className="bg-stone-900/90 border border-stone-800 rounded-2xl p-6 space-y-4 shadow-xl">
                       <div className="flex items-center justify-between border-b border-stone-800 pb-3">
                         <h4 className="text-sm font-black text-white uppercase tracking-wider flex items-center gap-2">
@@ -3021,7 +3146,7 @@ export default function App() {
 
                       <div className="space-y-2.5">
                         {posts
-                          .filter(p => p.category === 'MUSIC' || p.category === 'AMAPIANO' || (!['NEWS', 'VIDEOS', 'MOVIES'].includes(p.category)))
+                          .filter(isMusicPost)
                           .sort((a, b) => {
                             const parseVal = (val?: string) => {
                               if (!val) return 0;
@@ -3042,16 +3167,17 @@ export default function App() {
                               <span className={`text-xs font-black w-6 text-center ${idx === 0 ? 'text-amber-400 text-sm' : idx === 1 ? 'text-stone-300' : idx === 2 ? 'text-amber-600' : 'text-stone-500'}`}>
                                 #{idx + 1}
                               </span>
-                              <img src={track.cover} alt="" className="w-10 h-10 rounded-lg object-cover shrink-0 border border-stone-800" />
+                              <img src={track.image_url || track.cover} alt={track.title} className="w-10 h-10 rounded-lg object-cover shrink-0 border border-stone-800" />
                               <div className="flex-1 min-w-0">
                                 <h5 className="text-xs font-semibold text-white line-clamp-2 leading-snug">{track.title}</h5>
-                                <p className="text-[10px] text-stone-400 truncate">{track.subtitle}</p>
+                                <p className="text-[10px] text-amber-400 font-medium truncate">{track.artist || track.subtitle}</p>
                               </div>
                               <span className="text-[10px] text-amber-400 font-bold shrink-0">View →</span>
                             </div>
                           ))}
                       </div>
                     </div>
+
 
                     {/* VIP Newsletter Subscription */}
                     <div className="bg-gradient-to-br from-stone-900 to-amber-950/40 border border-stone-800 rounded-2xl p-6 space-y-4 shadow-lg">
@@ -3828,14 +3954,14 @@ export default function App() {
                   <p className="text-xs text-stone-400">Stream and download the latest Nigerian & African hit singles.</p>
                 </div>
                 <div className="space-y-3.5">
-                  {posts.filter(p => p.category === 'MUSIC' || p.category === 'AMAPIANO').map(p => (
+                  {posts.filter(isMusicPost).map(p => (
                     <div
                       key={p.id}
                       onClick={() => { setSelectedPostId(p.id); setCurrentRoute('post'); }}
                       className="flex items-center gap-4 p-3.5 bg-stone-900/90 rounded-xl border border-stone-800/80 hover:border-amber-500/50 transition shadow-sm cursor-pointer"
                     >
                       <div className="w-20 h-20 shrink-0 rounded-lg overflow-hidden relative border border-stone-800">
-                        <img src={p.cover} alt="" className="w-full h-full object-cover" />
+                        <img src={p.image_url || p.cover} alt={p.title} className="w-full h-full object-cover" />
                       </div>
                       <div className="flex-1 min-w-0 space-y-1">
                         <div className="flex items-center gap-2">
@@ -3844,16 +3970,33 @@ export default function App() {
                           <span className="text-[10px] text-stone-500">• {p.downloads || '14.2K'} downloads</span>
                         </div>
                         <h4 className="text-sm md:text-base font-semibold text-white line-clamp-2 leading-snug">{p.title}</h4>
-                        <p className="text-xs text-stone-400 line-clamp-1">{p.subtitle} • {p.body}</p>
+                        <p className="text-xs text-amber-400 font-semibold truncate">{p.artist || p.subtitle}</p>
+                        <p className="text-xs text-stone-400 line-clamp-1" style={{ whiteSpace: 'pre-wrap' }}>{p.content || p.body}</p>
                       </div>
-                      <button
-                        onClick={(e) => { e.stopPropagation(); setSelectedPostId(p.id); setCurrentRoute('post'); }}
-                        className="shrink-0 px-3.5 py-2 text-xs font-bold bg-amber-500 hover:bg-amber-400 text-stone-950 rounded-lg shadow"
-                      >
-                        View Post →
-                      </button>
+                      <div className="shrink-0 flex items-center gap-2">
+                        {(p.audio_url || p.audioUrl) && (
+                          <button
+                            onClick={(e) => { e.stopPropagation(); handlePlayTrack(p); }}
+                            className="p-2.5 bg-stone-800 hover:bg-stone-700 text-amber-400 rounded-lg border border-stone-700"
+                            title="Play Audio"
+                          >
+                            {isPlaying && currentPlayingTrack?.id === p.id ? <Pause className="w-4 h-4 fill-amber-400" /> : <Play className="w-4 h-4 fill-amber-400 ml-0.5" />}
+                          </button>
+                        )}
+                        <button
+                          onClick={(e) => { e.stopPropagation(); setSelectedPostId(p.id); setCurrentRoute('post'); }}
+                          className="px-3.5 py-2 text-xs font-bold bg-amber-500 hover:bg-amber-400 text-stone-950 rounded-lg shadow"
+                        >
+                          View Post →
+                        </button>
+                      </div>
                     </div>
                   ))}
+                  {posts.filter(isMusicPost).length === 0 && (
+                    <div className="text-center py-12 bg-stone-900/50 rounded-2xl border border-stone-800">
+                      <p className="text-sm text-stone-400">No music tracks found in this category yet.</p>
+                    </div>
+                  )}
                 </div>
               </div>
             )}
@@ -3866,14 +4009,14 @@ export default function App() {
                   <p className="text-xs text-stone-400">Watch cinematic 4K music video premieres from top African artists.</p>
                 </div>
                 <div className="space-y-3.5">
-                  {posts.filter(p => p.category === 'VIDEOS').map(p => (
+                  {posts.filter(isMoviePost).map(p => (
                     <div
                       key={p.id}
                       onClick={() => { setSelectedPostId(p.id); setCurrentRoute('post'); }}
-                      className="flex items-center gap-4 p-3.5 bg-stone-900/90 rounded-xl border border-stone-800/80 hover:border-amber-500/50 transition shadow-sm cursor-pointer"
+                      className="flex items-center gap-4 p-3.5 bg-stone-900/90 rounded-xl border border-stone-800/80 hover:border-blue-500/50 transition shadow-sm cursor-pointer"
                     >
                       <div className="w-20 h-20 shrink-0 rounded-lg overflow-hidden relative border border-stone-800">
-                        <img src={p.cover} alt="" className="w-full h-full object-cover" />
+                        <img src={p.image_url || p.cover} alt={p.title} className="w-full h-full object-cover" />
                       </div>
                       <div className="flex-1 min-w-0 space-y-1">
                         <div className="flex items-center gap-2">
@@ -3882,7 +4025,8 @@ export default function App() {
                           <span className="text-[10px] text-stone-500">• {p.views || '2.8M'} views</span>
                         </div>
                         <h4 className="text-sm md:text-base font-semibold text-white line-clamp-2 leading-snug">{p.title}</h4>
-                        <p className="text-xs text-stone-400 line-clamp-1">{p.subtitle} • {p.body}</p>
+                        <p className="text-xs text-blue-400 font-semibold truncate">{p.artist || p.subtitle}</p>
+                        <p className="text-xs text-stone-400 line-clamp-1" style={{ whiteSpace: 'pre-wrap' }}>{p.content || p.body}</p>
                       </div>
                       <button
                         onClick={(e) => { e.stopPropagation(); setSelectedPostId(p.id); setCurrentRoute('post'); }}
@@ -3892,11 +4036,16 @@ export default function App() {
                       </button>
                     </div>
                   ))}
+                  {posts.filter(isMoviePost).length === 0 && (
+                    <div className="text-center py-12 bg-stone-900/50 rounded-2xl border border-stone-800">
+                      <p className="text-sm text-stone-400">No video premieres found yet.</p>
+                    </div>
+                  )}
                 </div>
               </div>
             )}
 
-            {/* ROUTE: MOVIES */}
+            {/* ROUTE: MOVIES (Strictly movie/video posts, NO audio posts) */}
             {currentRoute === 'movies' && (
               <div className="space-y-6 max-w-4xl mx-auto">
                 <div className="text-center max-w-xl mx-auto space-y-2">
@@ -3904,14 +4053,14 @@ export default function App() {
                   <p className="text-xs text-stone-400">Exclusive Nollywood movie premieres and cinematic releases.</p>
                 </div>
                 <div className="space-y-3.5">
-                  {posts.filter(p => p.category === 'MOVIES' || p.category === 'VIDEOS').map(p => (
+                  {posts.filter(isMoviePost).map(p => (
                     <div
                       key={p.id}
                       onClick={() => { setSelectedPostId(p.id); setCurrentRoute('post'); }}
                       className="flex items-center gap-4 p-3.5 bg-stone-900/90 rounded-xl border border-stone-800/80 hover:border-amber-500/50 transition shadow-sm cursor-pointer"
                     >
                       <div className="w-20 h-20 shrink-0 rounded-lg overflow-hidden relative border border-stone-800">
-                        <img src={p.cover} alt="" className="w-full h-full object-cover" />
+                        <img src={p.image_url || p.cover} alt={p.title} className="w-full h-full object-cover" />
                       </div>
                       <div className="flex-1 min-w-0 space-y-1">
                         <div className="flex items-center gap-2">
@@ -3919,7 +4068,8 @@ export default function App() {
                           <span className="text-[10px] text-stone-400">{p.date}</span>
                         </div>
                         <h4 className="text-sm md:text-base font-semibold text-white line-clamp-2 leading-snug">{p.title}</h4>
-                        <p className="text-xs text-stone-400 line-clamp-1">{p.subtitle} • {p.body}</p>
+                        <p className="text-xs text-amber-400 font-semibold truncate">{p.artist || p.subtitle}</p>
+                        <p className="text-xs text-stone-400 line-clamp-1" style={{ whiteSpace: 'pre-wrap' }}>{p.content || p.body}</p>
                       </div>
                       <button
                         onClick={(e) => { e.stopPropagation(); setSelectedPostId(p.id); setCurrentRoute('post'); }}
@@ -3929,6 +4079,11 @@ export default function App() {
                       </button>
                     </div>
                   ))}
+                  {posts.filter(isMoviePost).length === 0 && (
+                    <div className="text-center py-12 bg-stone-900/50 rounded-2xl border border-stone-800">
+                      <p className="text-sm text-stone-400">No movie premieres published yet.</p>
+                    </div>
+                  )}
                 </div>
               </div>
             )}
@@ -3941,14 +4096,14 @@ export default function App() {
                   <p className="text-xs text-stone-400">Latest breaking entertainment news, interviews, and celebrity gist.</p>
                 </div>
                 <div className="space-y-3.5">
-                  {posts.filter(p => p.category === 'NEWS').map(p => (
+                  {posts.filter(isNewsPost).map(p => (
                     <div
                       key={p.id}
                       onClick={() => { setSelectedPostId(p.id); setCurrentRoute('post'); }}
                       className="flex items-center gap-4 p-3.5 bg-stone-900/90 rounded-xl border border-stone-800/80 hover:border-amber-500/50 transition shadow-sm cursor-pointer"
                     >
                       <div className="w-20 h-20 shrink-0 rounded-lg overflow-hidden relative border border-stone-800">
-                        <img src={p.cover} alt="" className="w-full h-full object-cover" />
+                        <img src={p.image_url || p.cover} alt={p.title} className="w-full h-full object-cover" />
                       </div>
                       <div className="flex-1 min-w-0 space-y-1">
                         <div className="flex items-center gap-2">
@@ -3957,19 +4112,25 @@ export default function App() {
                           <span className="text-[10px] text-stone-500">• {p.readTime || '3 min read'}</span>
                         </div>
                         <h4 className="text-sm md:text-base font-semibold text-white line-clamp-2 leading-snug">{p.title}</h4>
-                        <p className="text-xs text-stone-400 line-clamp-1">{p.body}</p>
+                        <p className="text-xs text-stone-400 line-clamp-2" style={{ whiteSpace: 'pre-wrap' }}>{p.content || p.body}</p>
                       </div>
                       <button
                         onClick={(e) => { e.stopPropagation(); setSelectedPostId(p.id); setCurrentRoute('post'); }}
                         className="shrink-0 px-3.5 py-2 text-xs font-bold bg-amber-500 hover:bg-amber-400 text-stone-950 rounded-lg shadow"
                       >
-                        Read →
+                        Read Article →
                       </button>
                     </div>
                   ))}
+                  {posts.filter(isNewsPost).length === 0 && (
+                    <div className="text-center py-12 bg-stone-900/50 rounded-2xl border border-stone-800">
+                      <p className="text-sm text-stone-400">No news articles published yet.</p>
+                    </div>
+                  )}
                 </div>
               </div>
             )}
+
 
             {/* ROUTE: INNER POST DETAIL PAGE (/post/:id) */}
             {currentRoute === 'post' && selectedPostId && (() => {
@@ -3999,14 +4160,14 @@ export default function App() {
                     </div>
 
                     <h1 className="text-2xl md:text-3xl font-black text-white tracking-tight leading-snug">{post.title}</h1>
-                    <p className="text-sm font-semibold text-amber-400">{post.subtitle}</p>
+                    <p className="text-sm font-semibold text-amber-400">{post.artist || post.subtitle}</p>
 
                     <div className="w-full h-72 md:h-96 rounded-xl overflow-hidden border border-stone-800 shadow-lg">
-                      <img src={post.cover} alt="" className="w-full h-full object-cover" />
+                      <img src={post.image_url || post.cover} alt={post.title} className="w-full h-full object-cover" />
                     </div>
 
-                    <div className="space-y-4 text-stone-300 text-sm leading-relaxed pt-2">
-                      <p>{post.body}</p>
+                    <div className="space-y-4 text-stone-300 text-sm leading-relaxed pt-2" style={{ whiteSpace: 'pre-wrap' }}>
+                      <p style={{ whiteSpace: 'pre-wrap' }}>{post.content || post.body}</p>
                       {post.lyrics && (
                         <div className="bg-stone-950 p-4 rounded-xl border border-stone-800 space-y-2 font-mono text-xs text-amber-300/90">
                           <h5 className="font-bold text-white uppercase text-[10px] tracking-wider mb-2">Lyrics / Verse</h5>
@@ -4018,7 +4179,7 @@ export default function App() {
                     {/* MEDIA PLAYER & DOWNLOAD SECTION */}
                     <div className="bg-stone-950 border border-stone-800 rounded-xl p-6 space-y-4">
                       <h4 className="text-sm font-bold text-white uppercase tracking-wider">Media Player & Downloads</h4>
-                      {post.audioUrl ? (
+                      {(post.audio_url || post.audioUrl || (post as any).audio_link) ? (
                         <div className="flex flex-col md:flex-row items-center gap-4 bg-stone-900 p-4 rounded-xl border border-stone-800">
                           <button
                             onClick={() => handlePlayTrack(post)}
@@ -4028,20 +4189,31 @@ export default function App() {
                           </button>
                           <div className="flex-1 text-center md:text-left min-w-0">
                             <h5 className="text-sm font-bold text-white truncate">{post.title}</h5>
-                            <p className="text-xs text-stone-400">{post.subtitle} • {post.duration || '03:45'}</p>
+                            <p className="text-xs text-amber-400 font-semibold">{post.artist || post.subtitle} • {post.duration || '03:45'}</p>
+                            {/* Active Audio Stream Player directly mapped to post.audio_url */}
+                            <audio
+                              controls
+                              src={post.audio_url || post.audioUrl || (post as any).audio_link}
+                              className="w-full mt-2 h-9 rounded-lg"
+                            />
                           </div>
-                          <button
-                            onClick={() => handleDownloadFile(post)}
-                            className="bg-amber-500 hover:bg-amber-400 text-stone-950 font-bold px-5 py-2.5 rounded-xl text-xs flex items-center gap-2 shadow transition-transform hover:scale-105 cursor-pointer"
+                          <a
+                            href={post.audio_url || post.audioUrl || (post as any).audio_link}
+                            download={`${(post.title || 'afropulse_track').replace(/[^a-z0-9]/gi, '_')}.mp3`}
+                            onClick={(e) => {
+                              e.preventDefault();
+                              handleDownloadFile(post);
+                            }}
+                            className="bg-amber-500 hover:bg-amber-400 text-stone-950 font-bold px-5 py-2.5 rounded-xl text-xs flex items-center gap-2 shadow transition-transform hover:scale-105 cursor-pointer shrink-0"
                           >
                             <Download className="w-4 h-4" /> Download MP3
-                          </button>
+                          </a>
                         </div>
-                      ) : post.videoUrl ? (
+                      ) : (post.video_url || post.videoUrl || (post as any).video_link) ? (
                         <div className="space-y-4">
                           <div className="aspect-video w-full rounded-xl overflow-hidden bg-stone-900 border border-stone-800">
                             <iframe
-                              src={post.videoUrl.replace('watch?v=', 'embed/')}
+                              src={(post.video_url || post.videoUrl || (post as any).video_link).replace('watch?v=', 'embed/')}
                               title={post.title}
                               className="w-full h-full"
                               allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
@@ -4049,7 +4221,7 @@ export default function App() {
                             ></iframe>
                           </div>
                           <a
-                            href={post.videoUrl}
+                            href={post.video_url || post.videoUrl || (post as any).video_link}
                             target="_blank"
                             rel="noopener noreferrer"
                             className="inline-flex items-center gap-2 bg-blue-600 hover:bg-blue-500 text-white font-bold px-5 py-2.5 rounded-xl text-xs"
@@ -4125,10 +4297,10 @@ export default function App() {
                             onClick={() => { setSelectedPostId(rp.id); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
                             className="flex items-center gap-4 p-3 bg-stone-900 border border-stone-800 rounded-xl hover:border-amber-500/50 transition cursor-pointer"
                           >
-                            <img src={rp.cover} alt="" className="w-16 h-16 rounded-lg object-cover shrink-0" />
+                            <img src={rp.image_url || rp.cover} alt={rp.title} className="w-16 h-16 rounded-lg object-cover shrink-0" />
                             <div className="flex-1 min-w-0 space-y-1">
                               <h5 className="text-xs font-bold text-white line-clamp-1">{rp.title}</h5>
-                              <p className="text-[11px] text-stone-400 truncate">{rp.subtitle}</p>
+                              <p className="text-[11px] text-amber-400 font-medium truncate">{rp.artist || rp.subtitle}</p>
                             </div>
                             <span className="text-xs text-amber-400 font-bold px-3 py-1 bg-amber-500/10 rounded-lg">View →</span>
                           </div>
@@ -5064,12 +5236,12 @@ export default function App() {
       {/* FLOATING AUDIO STREAMING & DOWNLOAD PLAYER BAR */}
       {currentPlayingTrack && (
         <aside aria-label="Audio Player" className="fixed bottom-4 left-4 right-4 md:left-auto md:right-8 md:w-96 z-50 bg-stone-900/95 backdrop-blur-md border border-amber-500/40 rounded-2xl p-3.5 shadow-2xl flex items-center gap-3">
-          {currentPlayingTrack.cover && (
-            <img src={currentPlayingTrack.cover} alt="" className="w-12 h-12 rounded-xl object-cover shrink-0 border border-stone-800" />
+          {(currentPlayingTrack.image_url || currentPlayingTrack.cover) && (
+            <img src={currentPlayingTrack.image_url || currentPlayingTrack.cover} alt={currentPlayingTrack.title} className="w-12 h-12 rounded-xl object-cover shrink-0 border border-stone-800" />
           )}
           <div className="flex-1 min-w-0">
             <h5 className="text-xs font-bold text-white truncate">{currentPlayingTrack.title}</h5>
-            <p className="text-[10px] text-amber-400 truncate">{currentPlayingTrack.subtitle}</p>
+            <p className="text-[10px] text-amber-400 font-medium truncate">{currentPlayingTrack.artist || currentPlayingTrack.subtitle}</p>
           </div>
           <button
             onClick={() => handlePlayTrack(currentPlayingTrack)}
