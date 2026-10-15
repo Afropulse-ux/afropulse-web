@@ -659,12 +659,12 @@ export default function App() {
                 title: p.title || 'Untitled Post',
                 subtitle: p.subtitle || p.artist || 'AfroPulse Exclusive',
                 category: (p.category?.toUpperCase() as any) || (p.genre?.toLowerCase().includes('amapiano') ? 'AMAPIANO' : 'MUSIC'),
-                cover: p.cover || p.cover_url || 'https://images.unsplash.com/photo-1514525253161-7a46d19cd819?auto=format&fit=crop&w=800&q=80',
+                cover: p.image_url || p.cover || p.cover_url || 'https://images.unsplash.com/photo-1514525253161-7a46d19cd819?auto=format&fit=crop&w=800&q=80',
                 date: p.created_at ? new Date(p.created_at).toLocaleDateString() : (p.date || 'Just now'),
                 duration: p.duration || '03:30',
                 downloads: p.downloads || '1.2K',
                 views: p.views,
-                body: p.body || p.description || 'Exclusive release on AfroPulse.',
+                body: p.content || p.body || p.description || 'Exclusive release on AfroPulse.',
                 lyrics: Array.isArray(p.lyrics) ? p.lyrics : (typeof p.lyrics === 'string' ? p.lyrics.split('\n') : undefined),
                 audioUrl: p.audio_url || p.audioUrl || '',
                 videoUrl: p.video_url || p.videoUrl || '',
@@ -1542,8 +1542,13 @@ export default function App() {
         driveAudioLink: ''
       });
 
+      setStatusMessage('Post published successfully!');
+      
+      // Auto-refresh feeds
       await fetchAllSupabaseContent();
       await refreshAdminContent();
+      
+      setTimeout(() => setStatusMessage(''), 3000);
     } finally {
       setIsPublishingPost(false);
     }
