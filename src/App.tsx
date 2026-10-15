@@ -948,30 +948,28 @@ export default function App() {
     }
   });
 
-  // Admin Uploader Form State (Direct File Pickers)
-  const [isPublishingPost, setIsPublishingPost] = useState(false);
-  const [statusMessage, setStatusMessage] = useState('');
+  // Admin Uploader Form State
   const [title, setTitle] = useState('');
   const [artist, setArtist] = useState('');
   const [featuredArtist, setFeaturedArtist] = useState('');
-  const [category, setCategory] = useState<'MUSIC' | 'VIDEOS' | 'NEWS' | 'AMAPIANO'>('MUSIC');
+  const [content, setContent] = useState('');
+  const [category, setCategory] = useState('news');
+  const [genre, setGenre] = useState('');
+  const [imageUrl, setImageUrl] = useState('');
+  const [middleImageUrl, setMiddleImageUrl] = useState('');
+  const [audioUrl, setAudioUrl] = useState('');
   const [coverFile, setCoverFile] = useState<File | null>(null);
   const [middleImageFile, setMiddleImageFile] = useState<File | null>(null);
-  const [coverPreview, setCoverPreview] = useState('');
+  const [editingPostId, setEditingPostId] = useState<string | null>(null);
+  const [isPublishing, setIsPublishing] = useState(false);
+  const [statusMessage, setStatusMessage] = useState('');
   const [audioFile, setAudioFile] = useState<File | null>(null);
   const [videoFile, setVideoFile] = useState<File | null>(null);
   const [youtubeUrl, setYoutubeUrl] = useState('');
-  const [body, setBody] = useState('');
-  const [lyrics, setLyrics] = useState('');
-  const [spotify, setSpotify] = useState('');
-  const [tiktok, setTiktok] = useState('');
-  const [instagram, setInstagram] = useState('');
-  const [twitter, setTwitter] = useState('');
-  const [youtubeChannel, setYoutubeChannel] = useState('');
+  const [driveAudioLink, setDriveAudioLink] = useState('');
   const [isHero, setIsHero] = useState(false);
   const [uploadType, setUploadType] = useState<'SINGLE' | 'EP_ALBUM'>('SINGLE');
   const [epDescription, setEpDescription] = useState('');
-  const [driveAudioLink, setDriveAudioLink] = useState('');
   const [uform, setUform] = useState({ /* keeping for other fields */ });
 
   // Admin Beat Uploader State
@@ -1418,8 +1416,7 @@ export default function App() {
     }
   };
 
-  const [editingPostId, setEditingPostId] = useState<string | null>(null);
-  const [middleImageUrl, setMiddleImageUrl] = useState('');
+
 
   const handlePublishPost = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -1428,7 +1425,7 @@ export default function App() {
       return;
     }
 
-    setIsPublishingPost(true);
+    setIsPublishing(true);
     setStatusMessage('Starting publish...');
 
     try {
@@ -1470,10 +1467,10 @@ export default function App() {
         title: title,
         artist: artist || 'HD Sounz',
         featured_artist: featuredArtist || '',
-        genre: category,
+        genre: genre,
         category: catNormalized,
         audioLink: driveAudioLink || audioUrl,
-        videoLink: youtubeUrl || videoUrl,
+        videoLink: youtubeUrl,
         body: content,
         content: content,
         imageUrl: finalImageUrl,
@@ -1501,6 +1498,7 @@ export default function App() {
       setAudioUrl('');
       setYoutubeUrl('');
       setCoverFile(null);
+      setMiddleImageFile(null);
       setAudioFile(null);
       setEditingPostId(null);
       
@@ -1509,7 +1507,7 @@ export default function App() {
     } catch (error: any) {
       alert('Publish failed: ' + error.message);
     } finally {
-      setIsPublishingPost(false);
+      setIsPublishing(false);
       setStatusMessage('');
     }
   };
