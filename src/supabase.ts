@@ -232,6 +232,7 @@ export async function handlePublishWithStatus(postData: any, imageFile: File | n
       title: postData.title,
       artist: postData.mainArtist || postData.artist || '',
       main_artist: postData.mainArtist || postData.artist || '',
+      featured_artist: postData.featured_artist || postData.featuring || postData.subtitle || '',
       subtitle: postData.featuring || postData.subtitle || '',
       featuring: postData.featuring || postData.subtitle || '',
       genre: postData.genre || cat,
@@ -261,8 +262,11 @@ export async function handlePublishWithStatus(postData: any, imageFile: File | n
         image_url: finalImage,
         created_at: new Date().toISOString()
       };
-      if (postData.mainArtist) standardPayload.artist = postData.mainArtist;
+      if (postData.mainArtist || postData.artist) standardPayload.artist = postData.mainArtist || postData.artist;
+      if (postData.featured_artist || postData.featuring) standardPayload.featured_artist = postData.featured_artist || postData.featuring;
+      if (postData.genre) standardPayload.genre = postData.genre;
       if (finalAudio) standardPayload.audio_url = finalAudio;
+      if (postData.videoLink) standardPayload.video_url = postData.videoLink;
       
       const retry = await supabase.from('posts').insert([standardPayload]).select();
       if (retry.error) {

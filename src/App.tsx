@@ -75,6 +75,8 @@ interface PostItem {
   title: string;
   subtitle: string;
   artist: string;
+  featured_artist?: string;
+  genre?: string;
   category: string;
   cover: string;
   image_url: string;
@@ -104,35 +106,26 @@ interface PostItem {
   };
 }
 
-// STRICT SECTION & CATEGORY FILTERING HELPERS:
-// 1. Music/Audio: category 'audio' or 'music' ONLY render inside Music/Audio section feed
-export const isMusicPost = (p: { category?: string; audio_url?: string; audioUrl?: string; video_url?: string; videoUrl?: string }) => {
+// STRICT UNIVERSAL CATEGORY ROUTING:
+// 1. Music feed: shows only category === 'audio' or 'music'
+export const isMusicPost = (p: { category?: string }) => {
   const cat = (p.category || '').toLowerCase().trim();
-  // Ensure NO video, movie, beats, or news posts are considered music
-  if (['movie', 'movies', 'video', 'videos', 'movie_premiere', 'news', 'gossip', 'beats', 'beat'].includes(cat)) {
-    return false;
-  }
-  return cat === 'audio' || cat === 'music' || cat === 'amapiano' || cat === 'general' || !cat;
+  return cat === 'audio' || cat === 'music';
 };
 
-// 2. Movie/Video: category 'video' or 'movie' must ONLY render inside Movie section feed.
-// Ensure NO audio posts leak into the Movie section.
-export const isMoviePost = (p: { category?: string; audio_url?: string; audioUrl?: string; video_url?: string; videoUrl?: string }) => {
+// 2. Movie feed: shows only category === 'video' or 'movie'
+export const isMoviePost = (p: { category?: string }) => {
   const cat = (p.category || '').toLowerCase().trim();
-  // Strict exclusion: never allow audio, music, beats, or news posts to leak into movie/video feeds
-  if (cat === 'audio' || cat === 'music' || cat === 'amapiano' || cat === 'beats' || cat === 'beat' || cat === 'news' || cat === 'gossip') {
-    return false;
-  }
-  return cat === 'video' || cat === 'videos' || cat === 'movie' || cat === 'movies' || cat === 'movie_premiere';
+  return cat === 'video' || cat === 'movie';
 };
 
-// 3. Beats: category 'beats' must ONLY render inside Beats section feed
+// 3. Beats feed: shows only category === 'beats'
 export const isBeatsPost = (p: { category?: string }) => {
   const cat = (p.category || '').toLowerCase().trim();
   return cat === 'beats' || cat === 'beat';
 };
 
-// 4. News: category 'news' must ONLY render inside News section feed
+// 4. News feed: shows only category === 'news'
 export const isNewsPost = (p: { category?: string }) => {
   const cat = (p.category || '').toLowerCase().trim();
   return cat === 'news' || cat === 'gossip';
@@ -709,35 +702,40 @@ export default function App() {
             // 3. Video mapping
             const vidUrl = p.video_url || p.video_link || p.videoUrl || '';
             // 4. Artist mapping: explicitly prioritize artist or main_artist
-            const artistName = p.artist || p.main_artist || p.subtitle || (isBeat ? (p.producer || 'AfroPulse Producer') : 'AfroPulse Artist');
+            const artistName = p.artist || p.main_artist || (isBeat ? (p.producer || 'AfroPulse Producer') : 'AfroPulse Artist');
+            const featArtist = p.featured_artist || p.featuring || (p.subtitle && p.subtitle !== artistName ? p.subtitle : '');
             // 5. Content / Description mapping
             const postBody = p.content || p.body || p.description || 'Exclusive release on AfroPulse.';
 
             // Strict Category Assignment:
-            // - category 'audio' or 'music' ONLY render inside Music/Audio section feed
-            // - category 'video' or 'movie' must ONLY render inside Movie section feed
-            // - category 'beats' must ONLY render inside Beats section feed
-            // - category 'news' must ONLY render inside News section feed
-            let finalCat = 'music';
+            // - Music feed: shows only category === 'audio' or 'music'
+            // - Movie feed: shows only category === 'video' or 'movie'
+            // - Beats feed: shows only category === 'beats'
+            // - News feed: shows only category === 'news'
+            let finalCat = 'audio';
             if (rawCat === 'video' || rawCat === 'videos' || rawCat === 'movie' || rawCat === 'movies' || rawCat === 'movie_premiere') {
-              finalCat = 'movie';
+              finalCat = (rawCat === 'movie' || rawCat === 'movies' || rawCat === 'movie_premiere') ? 'movie' : 'video';
             } else if (rawCat === 'news' || rawCat === 'gossip') {
               finalCat = 'news';
             } else if (isBeat) {
               finalCat = 'beats';
-            } else if (rawCat === 'audio' || rawCat === 'music' || rawCat === 'amapiano') {
-              finalCat = 'music';
+            } else if (rawCat === 'audio' || rawCat === 'music') {
+              finalCat = rawCat;
             } else if (vidUrl && !audUrl) {
-              finalCat = 'movie';
+              finalCat = 'video';
             } else {
-              finalCat = 'music';
+              finalCat = 'audio';
             }
+
+            const pGenre = p.genre || (finalCat === 'movie' || finalCat === 'video' ? 'Cinema' : finalCat === 'beats' ? 'Beat' : finalCat === 'news' ? 'News' : 'Afrobeats');
 
             fetchedPosts.push({
               id: postId,
               title: p.title || 'Untitled Post',
               artist: artistName,
-              subtitle: artistName,
+              featured_artist: featArtist,
+              subtitle: featArtist ? `${artistName} ft. ${featArtist}` : artistName,
+              genre: pGenre,
               category: finalCat,
               image_url: imgUrl,
               cover: imgUrl || 'https://images.unsplash.com/photo-1514525253161-7a46d19cd819?auto=format&fit=crop&w=800&q=80',
@@ -805,13 +803,16 @@ export default function App() {
               const imgUrl = m.image_url || m.cover_url || m.cover || '';
               const audUrl = m.audio_url || m.audio_link || '';
               const artistName = m.artist || 'AfroPulse Artist';
+              const featArtist = m.featured_artist || m.featuring || '';
               const desc = m.description || m.content || m.body || 'Exclusive release on AfroPulse.';
               fetchedPosts.push({
                 id: postId,
                 title: m.title || 'Untitled Track',
                 artist: artistName,
-                subtitle: artistName,
-                category: 'music',
+                featured_artist: featArtist,
+                subtitle: featArtist ? `${artistName} ft. ${featArtist}` : artistName,
+                genre: m.genre || 'Afrobeats',
+                category: 'audio',
                 image_url: imgUrl,
                 cover: imgUrl || 'https://images.unsplash.com/photo-1514525253161-7a46d19cd819?auto=format&fit=crop&w=800&q=80',
                 date: m.created_at ? new Date(m.created_at).toLocaleDateString() : 'Just now',
@@ -844,13 +845,16 @@ export default function App() {
             const imgUrl = v.image_url || v.thumbnail_url || v.cover_url || '';
             const vidUrl = v.youtube_url || v.video_url || '';
             const artistName = v.artist || 'AfroPulse Video';
+            const featArtist = v.featured_artist || v.featuring || '';
             const desc = v.description || v.content || 'Official video premiere on AfroPulse.';
             fetchedPosts.push({
               id: vidId,
               title: v.title || 'Untitled Video',
               artist: artistName,
-              subtitle: artistName,
-              category: 'movie', // Strictly movie category so it never leaks into music
+              featured_artist: featArtist,
+              subtitle: featArtist ? `${artistName} ft. ${featArtist}` : artistName,
+              genre: v.genre || 'Cinema',
+              category: 'video', // Strictly movie/video
               image_url: imgUrl,
               cover: imgUrl || 'https://images.unsplash.com/photo-1574717024653-61fd2cf4d44d?auto=format&fit=crop&w=800&q=80',
               date: v.created_at ? new Date(v.created_at).toLocaleDateString() : 'Just now',
@@ -1462,15 +1466,30 @@ export default function App() {
     setIsPublishingPost(true);
     setStatusMessage('Starting publish...');
 
+    const rawCat = (uform.category || 'music').toLowerCase().trim();
+    let catNormalized = 'audio';
+    if (rawCat === 'video' || rawCat === 'videos' || rawCat === 'movie' || rawCat === 'movies') {
+      catNormalized = 'movie';
+    } else if (rawCat === 'news') {
+      catNormalized = 'news';
+    } else if (rawCat === 'beats' || rawCat === 'beat') {
+      catNormalized = 'beats';
+    } else {
+      catNormalized = 'audio';
+    }
+
     const postData = {
       title: uform.title,
+      artist: uform.mainArtist,
       mainArtist: uform.mainArtist,
+      featured_artist: uform.subtitle,
       featuring: uform.subtitle,
       genre: uform.category,
-      category: uform.category,
+      category: catNormalized,
       audioLink: uform.driveAudioLink,
       videoLink: uform.youtubeUrl,
       body: uform.body,
+      content: uform.body,
       imageUrl: uform.coverPreview
     };
 
@@ -1501,6 +1520,7 @@ export default function App() {
         epDescription: '',
         driveAudioLink: ''
       });
+      await fetchAllSupabaseContent();
       await refreshAdminContent();
     }
   };
@@ -2951,8 +2971,18 @@ export default function App() {
                       >
                         {flagshipTrack.title}
                       </h2>
-                      <p className="text-sm font-semibold text-amber-400">{flagshipTrack.artist || flagshipTrack.subtitle}</p>
-                      <p className="text-xs text-stone-300 line-clamp-2 max-w-2xl" style={{ whiteSpace: 'pre-wrap' }}>{flagshipTrack.content || flagshipTrack.body}</p>
+                      <div className="flex items-center justify-center md:justify-start gap-1.5 flex-wrap">
+                        <p className="text-sm font-semibold text-amber-400">{flagshipTrack.artist}</p>
+                        {flagshipTrack.featured_artist && (
+                          <span className="text-xs text-stone-400 font-medium">ft. {flagshipTrack.featured_artist}</span>
+                        )}
+                        {flagshipTrack.genre && (
+                          <span className="text-[10px] bg-stone-800 text-stone-300 font-mono px-2 py-0.5 rounded">
+                            {flagshipTrack.genre}
+                          </span>
+                        )}
+                      </div>
+                      <p className="text-xs text-stone-300 line-clamp-2 max-w-2xl" style={{ whiteSpace: 'pre-wrap' }}>{flagshipTrack.content || flagshipTrack.description || flagshipTrack.body}</p>
                       <div className="flex flex-wrap items-center justify-center md:justify-start gap-3 pt-2">
                         <button
                           onClick={() => handlePlayTrack(flagshipTrack)}
@@ -2962,12 +2992,14 @@ export default function App() {
                           Stream / Play Audio
                         </button>
                         {(flagshipTrack.audio_url || flagshipTrack.audioUrl) && (
-                          <button
-                            onClick={() => handleDownloadFile(flagshipTrack)}
-                            className="bg-stone-800 hover:bg-stone-700 text-amber-400 font-bold px-4 py-2.5 rounded-xl text-xs flex items-center gap-2 transition-all border border-stone-700"
+                          <a
+                            href={flagshipTrack.audio_url || flagshipTrack.audioUrl}
+                            download={`${(flagshipTrack.title || 'afropulse_track').replace(/[^a-z0-9]/gi, '_')}.mp3`}
+                            onClick={(e) => { e.preventDefault(); handleDownloadFile(flagshipTrack); }}
+                            className="bg-stone-800 hover:bg-stone-700 text-amber-400 font-bold px-4 py-2.5 rounded-xl text-xs flex items-center gap-2 transition-all border border-stone-700 cursor-pointer"
                           >
                             <Download className="w-4 h-4" /> Download MP3
-                          </button>
+                          </a>
                         )}
                         <button
                           onClick={() => { setSelectedPostId(flagshipTrack.id); setCurrentRoute('post'); }}
@@ -3030,17 +3062,27 @@ export default function App() {
                                 <img src={p.image_url || p.cover} alt={p.title} className="w-full h-full object-cover" />
                               </div>
                               <div className="flex-1 min-w-0 space-y-1">
-                                <div className="flex items-center gap-2">
-                                  <span className={`px-2 py-0.5 rounded text-[9px] font-bold uppercase ${isMusicPost(p) ? 'bg-emerald-500/20 text-emerald-400' : isNewsPost(p) ? 'bg-amber-500/20 text-amber-400' : 'bg-blue-500/20 text-blue-400'}`}>
-                                    {isMusicPost(p) ? 'MUSIC' : isNewsPost(p) ? 'NEWS' : 'MOVIE'}
+                                <div className="flex items-center gap-2 flex-wrap">
+                                  <span className={`px-2 py-0.5 rounded text-[9px] font-bold uppercase ${isMusicPost(p) ? 'bg-emerald-500/20 text-emerald-400' : isNewsPost(p) ? 'bg-amber-500/20 text-amber-400' : isBeatsPost(p) ? 'bg-cyan-500/20 text-cyan-400' : 'bg-blue-500/20 text-blue-400'}`}>
+                                    {p.category.toUpperCase()}
                                   </span>
+                                  {p.genre && (
+                                    <span className="px-1.5 py-0.5 rounded text-[9px] font-medium bg-stone-800 text-stone-300 uppercase font-mono">
+                                      {p.genre}
+                                    </span>
+                                  )}
                                   <span className="text-[10px] text-stone-400">{p.date}</span>
                                   <span className="text-[10px] text-stone-500">• {p.downloads || p.views || '12.4K'} views</span>
                                 </div>
                                 <h4 className="text-sm md:text-base font-semibold text-white line-clamp-2 leading-snug">{p.title}</h4>
-                                <p className="text-xs text-stone-400 line-clamp-1">
-                                  <span className="text-amber-400 font-semibold">{p.artist || p.subtitle}</span>
-                                  {p.content || p.body ? ` • ${p.content || p.body}` : ''}
+                                <div className="flex items-center gap-1.5 text-xs text-stone-400 flex-wrap">
+                                  <span className="text-amber-400 font-semibold">{p.artist}</span>
+                                  {p.featured_artist && (
+                                    <span className="text-stone-400">ft. {p.featured_artist}</span>
+                                  )}
+                                </div>
+                                <p className="text-xs text-stone-400 line-clamp-1" style={{ whiteSpace: 'pre-wrap' }}>
+                                  {p.content || p.description || p.body}
                                 </p>
                               </div>
                               <button
@@ -3086,9 +3128,12 @@ export default function App() {
                             >
                               <img src={n.image_url || n.cover} alt={n.title} className="w-20 h-20 rounded-lg object-cover shrink-0" />
                               <div className="flex-1 min-w-0 space-y-1">
-                                <span className="text-[9px] bg-amber-500/20 text-amber-400 font-bold px-2 py-0.5 rounded uppercase">Gossip</span>
+                                <div className="flex items-center gap-1.5 flex-wrap">
+                                  <span className="text-[9px] bg-amber-500/20 text-amber-400 font-bold px-2 py-0.5 rounded uppercase">{n.category.toUpperCase()}</span>
+                                  {n.genre && <span className="text-[9px] bg-stone-800 text-stone-300 font-mono px-1.5 py-0.5 rounded uppercase">{n.genre}</span>}
+                                </div>
                                 <h5 className="text-xs font-bold text-white line-clamp-2">{n.title}</h5>
-                                <p className="text-[11px] text-stone-400 line-clamp-2" style={{ whiteSpace: 'pre-wrap' }}>{n.content || n.body}</p>
+                                <p className="text-[11px] text-stone-400 line-clamp-2" style={{ whiteSpace: 'pre-wrap' }}>{n.content || n.description || n.body}</p>
                               </div>
                             </div>
                           ))}
@@ -3124,8 +3169,15 @@ export default function App() {
                                 <span className="absolute bottom-2 left-2 px-2 py-0.5 bg-black/70 backdrop-blur text-[10px] font-bold text-white rounded">03:45</span>
                               </div>
                               <div className="p-4 space-y-1">
+                                <div className="flex items-center gap-1.5 flex-wrap">
+                                  <span className="text-[9px] bg-blue-500/20 text-blue-400 font-bold px-2 py-0.5 rounded uppercase">{v.category.toUpperCase()}</span>
+                                  {v.genre && <span className="text-[9px] bg-stone-800 text-stone-300 font-mono px-1.5 py-0.5 rounded uppercase">{v.genre}</span>}
+                                </div>
                                 <h5 className="text-xs font-bold text-white truncate">{v.title}</h5>
-                                <p className="text-[11px] text-stone-400 truncate">{v.artist || v.subtitle}</p>
+                                <p className="text-[11px] text-stone-400 truncate">
+                                  <span className="text-blue-400 font-semibold">{v.artist}</span>
+                                  {v.featured_artist && <span className="text-stone-500 ml-1">ft. {v.featured_artist}</span>}
+                                </p>
                               </div>
                             </div>
                           ))}
@@ -3172,7 +3224,10 @@ export default function App() {
                               <img src={track.image_url || track.cover} alt={track.title} className="w-10 h-10 rounded-lg object-cover shrink-0 border border-stone-800" />
                               <div className="flex-1 min-w-0">
                                 <h5 className="text-xs font-semibold text-white line-clamp-2 leading-snug">{track.title}</h5>
-                                <p className="text-[10px] text-amber-400 font-medium truncate">{track.artist || track.subtitle}</p>
+                                <p className="text-[10px] text-amber-400 font-medium truncate">
+                                  <span>{track.artist}</span>
+                                  {track.featured_artist && <span className="text-stone-400 ml-1">ft. {track.featured_artist}</span>}
+                                </p>
                               </div>
                               <span className="text-[10px] text-amber-400 font-bold shrink-0">View →</span>
                             </div>
@@ -3966,24 +4021,39 @@ export default function App() {
                         <img src={p.image_url || p.cover} alt={p.title} className="w-full h-full object-cover" />
                       </div>
                       <div className="flex-1 min-w-0 space-y-1">
-                        <div className="flex items-center gap-2">
-                          <span className="px-2 py-0.5 rounded text-[9px] font-bold uppercase bg-emerald-500/20 text-emerald-400">MUSIC</span>
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className="px-2 py-0.5 rounded text-[9px] font-bold uppercase bg-emerald-500/20 text-emerald-400">{p.category.toUpperCase()}</span>
+                          {p.genre && <span className="px-1.5 py-0.5 rounded text-[9px] font-medium bg-stone-800 text-stone-300 uppercase font-mono">{p.genre}</span>}
                           <span className="text-[10px] text-stone-400">{p.date}</span>
                           <span className="text-[10px] text-stone-500">• {p.downloads || '14.2K'} downloads</span>
                         </div>
                         <h4 className="text-sm md:text-base font-semibold text-white line-clamp-2 leading-snug">{p.title}</h4>
-                        <p className="text-xs text-amber-400 font-semibold truncate">{p.artist || p.subtitle}</p>
-                        <p className="text-xs text-stone-400 line-clamp-1" style={{ whiteSpace: 'pre-wrap' }}>{p.content || p.body}</p>
+                        <p className="text-xs text-amber-400 font-semibold truncate">
+                          <span>{p.artist}</span>
+                          {p.featured_artist && <span className="text-stone-400 ml-1">ft. {p.featured_artist}</span>}
+                        </p>
+                        <p className="text-xs text-stone-400 line-clamp-1" style={{ whiteSpace: 'pre-wrap' }}>{p.content || p.description || p.body}</p>
                       </div>
                       <div className="shrink-0 flex items-center gap-2">
                         {(p.audio_url || p.audioUrl) && (
-                          <button
-                            onClick={(e) => { e.stopPropagation(); handlePlayTrack(p); }}
-                            className="p-2.5 bg-stone-800 hover:bg-stone-700 text-amber-400 rounded-lg border border-stone-700"
-                            title="Play Audio"
-                          >
-                            {isPlaying && currentPlayingTrack?.id === p.id ? <Pause className="w-4 h-4 fill-amber-400" /> : <Play className="w-4 h-4 fill-amber-400 ml-0.5" />}
-                          </button>
+                          <>
+                            <button
+                              onClick={(e) => { e.stopPropagation(); handlePlayTrack(p); }}
+                              className="p-2.5 bg-stone-800 hover:bg-stone-700 text-amber-400 rounded-lg border border-stone-700"
+                              title="Play / Stream Audio"
+                            >
+                              {isPlaying && currentPlayingTrack?.id === p.id ? <Pause className="w-4 h-4 fill-amber-400" /> : <Play className="w-4 h-4 fill-amber-400 ml-0.5" />}
+                            </button>
+                            <a
+                              href={p.audio_url || p.audioUrl}
+                              download={`${(p.title || 'afropulse_track').replace(/[^a-z0-9]/gi, '_')}.mp3`}
+                              onClick={(e) => { e.stopPropagation(); e.preventDefault(); handleDownloadFile(p); }}
+                              className="p-2.5 bg-amber-500 hover:bg-amber-400 text-stone-950 rounded-lg shadow font-bold cursor-pointer"
+                              title="Download MP3"
+                            >
+                              <Download className="w-4 h-4" />
+                            </a>
+                          </>
                         )}
                         <button
                           onClick={(e) => { e.stopPropagation(); setSelectedPostId(p.id); setCurrentRoute('post'); }}
@@ -4021,14 +4091,18 @@ export default function App() {
                         <img src={p.image_url || p.cover} alt={p.title} className="w-full h-full object-cover" />
                       </div>
                       <div className="flex-1 min-w-0 space-y-1">
-                        <div className="flex items-center gap-2">
-                          <span className="px-2 py-0.5 rounded text-[9px] font-bold uppercase bg-blue-500/20 text-blue-400">MUSIC VIDEO</span>
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className="px-2 py-0.5 rounded text-[9px] font-bold uppercase bg-blue-500/20 text-blue-400">{p.category.toUpperCase()}</span>
+                          {p.genre && <span className="px-1.5 py-0.5 rounded text-[9px] font-medium bg-stone-800 text-stone-300 uppercase font-mono">{p.genre}</span>}
                           <span className="text-[10px] text-stone-400">{p.date}</span>
                           <span className="text-[10px] text-stone-500">• {p.views || '2.8M'} views</span>
                         </div>
                         <h4 className="text-sm md:text-base font-semibold text-white line-clamp-2 leading-snug">{p.title}</h4>
-                        <p className="text-xs text-blue-400 font-semibold truncate">{p.artist || p.subtitle}</p>
-                        <p className="text-xs text-stone-400 line-clamp-1" style={{ whiteSpace: 'pre-wrap' }}>{p.content || p.body}</p>
+                        <p className="text-xs text-blue-400 font-semibold truncate">
+                          <span>{p.artist}</span>
+                          {p.featured_artist && <span className="text-stone-400 ml-1">ft. {p.featured_artist}</span>}
+                        </p>
+                        <p className="text-xs text-stone-400 line-clamp-1" style={{ whiteSpace: 'pre-wrap' }}>{p.content || p.description || p.body}</p>
                       </div>
                       <button
                         onClick={(e) => { e.stopPropagation(); setSelectedPostId(p.id); setCurrentRoute('post'); }}
@@ -4065,13 +4139,17 @@ export default function App() {
                         <img src={p.image_url || p.cover} alt={p.title} className="w-full h-full object-cover" />
                       </div>
                       <div className="flex-1 min-w-0 space-y-1">
-                        <div className="flex items-center gap-2">
-                          <span className="px-2 py-0.5 rounded text-[9px] font-bold uppercase bg-amber-500/20 text-amber-400">MOVIE</span>
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className="px-2 py-0.5 rounded text-[9px] font-bold uppercase bg-amber-500/20 text-amber-400">{p.category.toUpperCase()}</span>
+                          {p.genre && <span className="px-1.5 py-0.5 rounded text-[9px] font-medium bg-stone-800 text-stone-300 uppercase font-mono">{p.genre}</span>}
                           <span className="text-[10px] text-stone-400">{p.date}</span>
                         </div>
                         <h4 className="text-sm md:text-base font-semibold text-white line-clamp-2 leading-snug">{p.title}</h4>
-                        <p className="text-xs text-amber-400 font-semibold truncate">{p.artist || p.subtitle}</p>
-                        <p className="text-xs text-stone-400 line-clamp-1" style={{ whiteSpace: 'pre-wrap' }}>{p.content || p.body}</p>
+                        <p className="text-xs text-amber-400 font-semibold truncate">
+                          <span>{p.artist}</span>
+                          {p.featured_artist && <span className="text-stone-400 ml-1">ft. {p.featured_artist}</span>}
+                        </p>
+                        <p className="text-xs text-stone-400 line-clamp-1" style={{ whiteSpace: 'pre-wrap' }}>{p.content || p.description || p.body}</p>
                       </div>
                       <button
                         onClick={(e) => { e.stopPropagation(); setSelectedPostId(p.id); setCurrentRoute('post'); }}
@@ -4108,13 +4186,14 @@ export default function App() {
                         <img src={p.image_url || p.cover} alt={p.title} className="w-full h-full object-cover" />
                       </div>
                       <div className="flex-1 min-w-0 space-y-1">
-                        <div className="flex items-center gap-2">
-                          <span className="px-2 py-0.5 rounded text-[9px] font-bold uppercase bg-amber-500/20 text-amber-400">NEWS</span>
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className="px-2 py-0.5 rounded text-[9px] font-bold uppercase bg-amber-500/20 text-amber-400">{p.category.toUpperCase()}</span>
+                          {p.genre && <span className="px-1.5 py-0.5 rounded text-[9px] font-medium bg-stone-800 text-stone-300 uppercase font-mono">{p.genre}</span>}
                           <span className="text-[10px] text-stone-400">{p.date}</span>
                           <span className="text-[10px] text-stone-500">• {p.readTime || '3 min read'}</span>
                         </div>
                         <h4 className="text-sm md:text-base font-semibold text-white line-clamp-2 leading-snug">{p.title}</h4>
-                        <p className="text-xs text-stone-400 line-clamp-2" style={{ whiteSpace: 'pre-wrap' }}>{p.content || p.body}</p>
+                        <p className="text-xs text-stone-400 line-clamp-2" style={{ whiteSpace: 'pre-wrap' }}>{p.content || p.description || p.body}</p>
                       </div>
                       <button
                         onClick={(e) => { e.stopPropagation(); setSelectedPostId(p.id); setCurrentRoute('post'); }}
@@ -4153,23 +4232,33 @@ export default function App() {
                   </button>
 
                   <div className="bg-stone-900 border border-stone-800 rounded-2xl p-6 md:p-8 space-y-6 shadow-xl">
-                    <div className="flex items-center gap-3">
+                    <div className="flex flex-wrap items-center gap-3">
                       <span className="px-3 py-1 rounded text-xs font-bold bg-amber-500/20 text-amber-400 uppercase">
                         {post.category}
                       </span>
+                      {post.genre && (
+                        <span className="px-3 py-1 rounded text-xs font-bold bg-stone-800 text-stone-300 uppercase font-mono">
+                          {post.genre}
+                        </span>
+                      )}
                       <span className="text-xs text-stone-400">{post.date}</span>
                       <span className="text-xs text-stone-500">• {post.views || post.downloads || '14.2K'} views</span>
                     </div>
 
                     <h1 className="text-2xl md:text-3xl font-black text-white tracking-tight leading-snug">{post.title}</h1>
-                    <p className="text-sm font-semibold text-amber-400">{post.artist || post.subtitle}</p>
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <p className="text-sm font-semibold text-amber-400">{post.artist}</p>
+                      {post.featured_artist && (
+                        <span className="text-xs font-medium text-stone-400">ft. {post.featured_artist}</span>
+                      )}
+                    </div>
 
                     <div className="w-full h-72 md:h-96 rounded-xl overflow-hidden border border-stone-800 shadow-lg">
                       <img src={post.image_url || post.cover} alt={post.title} className="w-full h-full object-cover" />
                     </div>
 
                     <div className="space-y-4 text-stone-300 text-sm leading-relaxed pt-2" style={{ whiteSpace: 'pre-wrap' }}>
-                      <p style={{ whiteSpace: 'pre-wrap' }}>{post.content || post.body}</p>
+                      <p style={{ whiteSpace: 'pre-wrap' }}>{post.content || post.description || post.body}</p>
                       {post.lyrics && (
                         <div className="bg-stone-950 p-4 rounded-xl border border-stone-800 space-y-2 font-mono text-xs text-amber-300/90">
                           <h5 className="font-bold text-white uppercase text-[10px] tracking-wider mb-2">Lyrics / Verse</h5>
@@ -4191,7 +4280,11 @@ export default function App() {
                           </button>
                           <div className="flex-1 text-center md:text-left min-w-0">
                             <h5 className="text-sm font-bold text-white truncate">{post.title}</h5>
-                            <p className="text-xs text-amber-400 font-semibold">{post.artist || post.subtitle} • {post.duration || '03:45'}</p>
+                            <p className="text-xs text-amber-400 font-semibold">
+                              <span>{post.artist}</span>
+                              {post.featured_artist && <span className="text-stone-400 ml-1">ft. {post.featured_artist}</span>}
+                              <span> • {post.duration || '03:45'}</span>
+                            </p>
                             {/* Active Audio Stream Player directly mapped to post.audio_url */}
                             <audio
                               controls
@@ -4228,7 +4321,7 @@ export default function App() {
                             rel="noopener noreferrer"
                             className="inline-flex items-center gap-2 bg-blue-600 hover:bg-blue-500 text-white font-bold px-5 py-2.5 rounded-xl text-xs"
                           >
-                            Watch on YouTube / External Stream ↗
+                            Watch Video Stream / External Premiere ↗
                           </a>
                         </div>
                       ) : (
@@ -4302,7 +4395,10 @@ export default function App() {
                             <img src={rp.image_url || rp.cover} alt={rp.title} className="w-16 h-16 rounded-lg object-cover shrink-0" />
                             <div className="flex-1 min-w-0 space-y-1">
                               <h5 className="text-xs font-bold text-white line-clamp-1">{rp.title}</h5>
-                              <p className="text-[11px] text-amber-400 font-medium truncate">{rp.artist || rp.subtitle}</p>
+                              <p className="text-[11px] text-amber-400 font-medium truncate">
+                                <span>{rp.artist}</span>
+                                {rp.featured_artist && <span className="text-stone-400 ml-1">ft. {rp.featured_artist}</span>}
+                              </p>
                             </div>
                             <span className="text-xs text-amber-400 font-bold px-3 py-1 bg-amber-500/10 rounded-lg">View →</span>
                           </div>
@@ -5243,7 +5339,10 @@ export default function App() {
           )}
           <div className="flex-1 min-w-0">
             <h5 className="text-xs font-bold text-white truncate">{currentPlayingTrack.title}</h5>
-            <p className="text-[10px] text-amber-400 font-medium truncate">{currentPlayingTrack.artist || currentPlayingTrack.subtitle}</p>
+            <p className="text-[10px] text-amber-400 font-medium truncate">
+              <span>{currentPlayingTrack.artist}</span>
+              {currentPlayingTrack.featured_artist && <span className="text-stone-400 ml-1">ft. {currentPlayingTrack.featured_artist}</span>}
+            </p>
           </div>
           <button
             onClick={() => handlePlayTrack(currentPlayingTrack)}
