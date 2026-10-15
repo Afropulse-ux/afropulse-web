@@ -869,6 +869,7 @@ export default function App() {
 
   // Admin Uploader Form State (Direct File Pickers)
   const [isPublishingPost, setIsPublishingPost] = useState(false);
+  const [statusMessage, setStatusMessage] = useState('');
   const [uform, setUform] = useState({
     title: '',
     mainArtist: '',
@@ -1393,19 +1394,21 @@ export default function App() {
           });
           await refreshAdminContent();
           return;
-        } catch (err) {
+        } catch (err: any) {
           console.error('Update error:', err);
-          alert('Error updating record in Supabase.');
+          setStatusMessage(`Error updating record: ${err.message}`);
         }
       }
 
       // Upload files to Supabase Storage with fast fallback so button never freezes
+      setStatusMessage('Starting upload...');
       let finalCoverUrl = uform.coverPreview || 'https://images.unsplash.com/photo-1514525253161-7a46d19cd819?auto=format&fit=crop&w=800&q=80';
       let finalAudioUrl = '';
       let finalVideoUrl = uform.youtubeUrl || '';
 
       if (uform.coverFile) {
         try {
+          setStatusMessage('Uploading cover artwork...');
           finalCoverUrl = await uploadStorageAsset('cover_art', uform.coverFile);
         } catch (err) {
           console.warn('Cover upload failed, using fallback/preview:', err);
@@ -1415,6 +1418,7 @@ export default function App() {
 
       if (uform.audioFile) {
         try {
+          setStatusMessage('Uploading audio file...');
           finalAudioUrl = await uploadStorageAsset('music_files', uform.audioFile);
         } catch (err) {
           console.warn('Audio upload failed, using blob/fallback:', err);
@@ -1426,6 +1430,7 @@ export default function App() {
 
       if (uform.videoFile) {
         try {
+          setStatusMessage('Uploading video file...');
           finalVideoUrl = await uploadStorageAsset('video_files', uform.videoFile);
         } catch (err) {
           console.warn('Video upload failed, using fallback:', err);
@@ -1433,8 +1438,8 @@ export default function App() {
         }
       }
 
-      // 1. Mandatory Awaited Insert into Supabase 'posts' Table
       try {
+        setStatusMessage('Saving post to database...');
         const { error: postInsertError } = await supabase.from('posts').insert([
           {
             title: uform.title,
@@ -1458,23 +1463,12 @@ export default function App() {
             ep_description: uform.epDescription || ''
           }
         ]);
-
-        if (postInsertError) {
-          console.warn('Supabase posts insert notice, attempting minimal schema:', postInsertError);
-          await supabase.from('posts').insert([
-            {
-              title: uform.title,
-              subtitle: finalArtistName,
-              category: uform.category,
-              cover: finalCoverUrl,
-              audio_url: finalAudioUrl || undefined,
-              video_url: finalVideoUrl || undefined,
-              body: uform.body || ''
-            }
-          ]).catch(e => console.warn('Fallback minimal posts insert notice:', e));
-        }
-      } catch (insertErr) {
+        if (postInsertError) throw postInsertError;
+        setStatusMessage('Post saved to database successfully.');
+      } catch (insertErr: any) {
         console.warn('Error saving to posts table:', insertErr);
+        setStatusMessage(`Error saving post: ${insertErr.message}`);
+        throw insertErr;
       }
 
       // Also sync to music / videos tables to guarantee multi-table persistence
@@ -1536,7 +1530,7 @@ export default function App() {
       }
       setPosts(updated);
 
-      alert('Post published successfully to live AfroPulse feed and Supabase database!');
+      setStatusMessage('Post published successfully to live AfroPulse feed and Supabase database!');
 
       // Clean reset of all form fields (Requirement 3)
       setUform({
@@ -2286,6 +2280,13 @@ export default function App() {
                               />
                             </div>
                           </div>
+
+                          {/* Status Display */}
+                          {statusMessage && (
+                            <div className="p-3 bg-stone-950 border border-amber-500/30 rounded-xl text-amber-400 text-xs text-center font-mono">
+                              {statusMessage}
+                            </div>
+                          )}
 
                           <button
                             type="submit"
