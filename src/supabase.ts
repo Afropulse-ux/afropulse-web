@@ -193,3 +193,58 @@ export function convertGoogleDriveLink(link: string): string {
   }
   return link;
 }
+
+// Call this function from your Publish button click handler
+export async function handlePublishWithStatus(postData: any, mediaFile: File | null, setStatusMessage: (msg: string) => void) {
+  try {
+    setStatusMessage('Connecting to Supabase and uploading...');
+    let mediaUrl = null;
+
+    if (mediaFile) {
+      const fileExt = mediaFile.name.split('.').pop();
+      const fileName = `${Date.now()}.${fileExt}`;
+      const filePath = `public/${fileName}`;
+
+      setStatusMessage('Uploading media file...');
+      const { error: storageError } = await supabase.storage
+        .from('posts')
+        .upload(filePath, mediaFile, { cacheControl: '3600', upsert: true });
+
+      if (storageError) {
+        throw new Error(`Storage Error: ${storageError.message}`);
+      }
+
+      const { data: publicUrlData } = supabase.storage
+        .from('posts')
+        .getPublicUrl(filePath);
+
+      mediaUrl = publicUrlData.publicUrl;
+    }
+
+    setStatusMessage('Saving post to database...');
+    const payload = {
+      title: postData.title,
+      content: postData.content || '',
+      category: postData.category || 'general',
+      image_url: mediaUrl || postData.imageUrl || null,
+      created_at: new Date().toISOString()
+    };
+
+    const { data, error } = await supabase
+      .from('posts')
+      .insert([payload])
+      .select();
+
+    if (error) {
+      throw new Error(`Database Error [${error.code}]: ${error.message}`);
+    }
+
+    setStatusMessage('Success! Post published to Supabase.');
+    return { success: true, data };
+
+  } catch (err: any) {
+    console.error('Publishing Error:', err);
+    setStatusMessage(`ERROR: ${err.message}`);
+    return { success: false, error: err.message };
+  }
+}

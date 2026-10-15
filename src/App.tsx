@@ -54,7 +54,8 @@ import {
   fetchSupabaseVideos,
   updateSupabaseRecord,
   deleteSupabaseRecord,
-  convertGoogleDriveLink
+  convertGoogleDriveLink,
+  handlePublishWithStatus
 } from './supabase';
 export {
   supabase,
@@ -65,7 +66,8 @@ export {
   fetchSupabaseVideos,
   updateSupabaseRecord,
   deleteSupabaseRecord,
-  convertGoogleDriveLink
+  convertGoogleDriveLink,
+  handlePublishWithStatus
 };
 
 interface PostItem {
