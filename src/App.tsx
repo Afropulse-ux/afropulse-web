@@ -1345,180 +1345,25 @@ export default function App() {
     }
 
     setIsPublishingPost(true);
-    try {
-      const finalArtistName = uform.mainArtist?.trim()
-        ? (uform.subtitle?.trim() ? `${uform.mainArtist.trim()} ${uform.subtitle.trim()}` : uform.mainArtist.trim())
-        : (uform.subtitle?.trim() || 'AfroPulse Artist');
+    setStatusMessage('Starting publish...');
 
-      if (editingRecord) {
-        try {
-          let finalCover = uform.coverPreview;
-          let finalAudio = uform.audioFile ? URL.createObjectURL(uform.audioFile) : '';
-          if (uform.coverFile) {
-            finalCover = await uploadStorageAsset('cover_art', uform.coverFile, 4000).catch(() => uform.coverPreview);
-          }
-          if (uform.audioFile) {
-            finalAudio = await uploadStorageAsset('music_files', uform.audioFile, 4000).catch(() => '');
-          }
+    const postData = {
+      title: uform.title,
+      mainArtist: uform.mainArtist,
+      featuring: uform.subtitle,
+      genre: uform.category,
+      category: uform.category,
+      audioLink: uform.driveAudioLink,
+      videoLink: uform.youtubeUrl,
+      body: uform.body,
+      imageUrl: uform.coverPreview
+    };
 
-          await updateSupabaseRecord(editingRecord.tableSource, editingRecord.id, {
-            title: uform.title,
-            artist: finalArtistName,
-            genre: uform.category === 'AMAPIANO' ? 'Amapiano' : 'Afrobeats',
-            description: uform.body,
-            cover_url: finalCover,
-            audio_url: finalAudio || undefined,
-            youtube_url: uform.youtubeUrl || undefined
-          });
+    const result = await handlePublishWithStatus(postData, uform.coverFile, uform.audioFile, setStatusMessage);
+    setIsPublishingPost(false);
 
-          alert('Post updated successfully in Supabase!');
-          setEditingRecord(null);
-          setUform({
-            title: '',
-            mainArtist: '',
-            subtitle: '',
-            category: 'MUSIC',
-            coverFile: null,
-            coverPreview: '',
-            audioFile: null,
-            videoFile: null,
-            youtubeUrl: '',
-            body: '',
-            lyrics: '',
-            spotify: '',
-            tiktok: '',
-            instagram: '',
-            twitter: '',
-            youtubeChannel: '',
-            isHero: false
-          });
-          await refreshAdminContent();
-          return;
-        } catch (err: any) {
-          console.error('Update error:', err);
-          setStatusMessage(`Error updating record: ${err.message}`);
-        }
-      }
-
-      // Upload files to Supabase Storage with fast fallback so button never freezes
-      setStatusMessage('Starting upload...');
-      let finalCoverUrl = uform.coverPreview || 'https://images.unsplash.com/photo-1514525253161-7a46d19cd819?auto=format&fit=crop&w=800&q=80';
-      let finalAudioUrl = '';
-      let finalVideoUrl = uform.youtubeUrl || '';
-
-      if (uform.coverFile) {
-        try {
-          setStatusMessage('Uploading cover artwork...');
-          finalCoverUrl = await uploadStorageAsset('cover_art', uform.coverFile);
-        } catch (err) {
-          console.warn('Cover upload failed, using fallback/preview:', err);
-          finalCoverUrl = uform.coverPreview || finalCoverUrl;
-        }
-      }
-
-      if (uform.audioFile) {
-        try {
-          setStatusMessage('Uploading audio file...');
-          finalAudioUrl = await uploadStorageAsset('music_files', uform.audioFile);
-        } catch (err) {
-          console.warn('Audio upload failed, using blob/fallback:', err);
-          finalAudioUrl = URL.createObjectURL(uform.audioFile);
-        }
-      } else if (uform.driveAudioLink) {
-        finalAudioUrl = convertGoogleDriveLink(uform.driveAudioLink);
-      }
-
-      if (uform.videoFile) {
-        try {
-          setStatusMessage('Uploading video file...');
-          finalVideoUrl = await uploadStorageAsset('video_files', uform.videoFile);
-        } catch (err) {
-          console.warn('Video upload failed, using fallback:', err);
-          finalVideoUrl = URL.createObjectURL(uform.videoFile);
-        }
-      }
-
-      try {
-        setStatusMessage('Saving post to database...');
-        const { error: postInsertError } = await supabase.from('posts').insert([
-          {
-            title: uform.title,
-            content: uform.body || '',
-            category: uform.category || 'MUSIC',
-            image_url: finalCoverUrl,
-            created_at: new Date().toISOString()
-          }
-        ]);
-        if (postInsertError) throw postInsertError;
-        setStatusMessage('Post saved to database successfully.');
-      } catch (insertErr: any) {
-        console.warn('Error saving to posts table:', insertErr);
-        setStatusMessage(`Error saving post: ${insertErr.message}`);
-        throw insertErr;
-      }
-
-      // Also sync to music / videos tables to guarantee multi-table persistence
-      if (uform.category === 'VIDEOS' || uform.category === 'MOVIES') {
-        await supabase.from('videos').insert([
-          {
-            title: uform.title,
-            artist: finalArtistName,
-            category: uform.category === 'MOVIES' ? 'movie_premiere' : 'music_video',
-            thumbnail_url: finalCoverUrl,
-            video_url: finalVideoUrl || null,
-            youtube_url: uform.youtubeUrl || null,
-            description: uform.body || ''
-          }
-        ]).catch(e => console.warn('videos table sync notice:', e));
-      } else {
-        await supabase.from('music').insert([
-          {
-            title: uform.title,
-            artist: finalArtistName,
-            genre: uform.category === 'AMAPIANO' ? 'Amapiano' : 'Afrobeats',
-            track_type: 'song',
-            audio_url: finalAudioUrl || 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3',
-            cover_url: finalCoverUrl,
-            is_featured: uform.isHero,
-            is_hero: uform.isHero,
-            description: uform.body || ''
-          }
-        ]).catch(e => console.warn('music table sync notice:', e));
-      }
-
-      const newPost: PostItem = {
-        id: Date.now().toString(),
-        title: uform.title,
-        subtitle: finalArtistName,
-        category: uform.category,
-        cover: finalCoverUrl,
-        date: 'Just now',
-        duration: '03:30',
-        downloads: '12',
-        body: uform.body,
-        lyrics: uform.lyrics ? uform.lyrics.split('\n') : undefined,
-        audioUrl: finalAudioUrl || (uform.audioFile ? URL.createObjectURL(uform.audioFile) : 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3'),
-        videoUrl: finalVideoUrl || (uform.videoFile ? URL.createObjectURL(uform.videoFile) : (uform.youtubeUrl || undefined)),
-        isHero: uform.isHero,
-        socials: {
-          spotify: uform.spotify,
-          tiktok: uform.tiktok,
-          instagram: uform.instagram,
-          twitter: uform.twitter,
-          youtube: uform.youtubeChannel
-        }
-      };
-
-      let updated = [newPost, ...posts];
-      if (uform.isHero) {
-        updated = updated.map(p => p.id === newPost.id ? { ...p, isHero: true } : { ...p, isHero: false });
-        setFeaturedTrackId(newPost.id);
-      }
-      setPosts(updated);
-
-      setStatusMessage('Post published successfully to live AfroPulse feed and Supabase database!');
-
-      // Clean reset of all form fields (Requirement 3)
+    if (result.success) {
+      alert('Post Published Successfully!');
       setUform({
         title: '',
         mainArtist: '',
@@ -1541,18 +1386,10 @@ export default function App() {
         epDescription: '',
         driveAudioLink: ''
       });
-
-      setStatusMessage('Post published successfully!');
-      
-      // Auto-refresh feeds
-      await fetchAllSupabaseContent();
       await refreshAdminContent();
-      
-      setTimeout(() => setStatusMessage(''), 3000);
-    } finally {
-      setIsPublishingPost(false);
     }
   };
+
 
   const handlePublishBeat = async (e: React.FormEvent) => {
     e.preventDefault();

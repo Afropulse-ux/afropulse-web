@@ -195,38 +195,45 @@ export function convertGoogleDriveLink(link: string): string {
 }
 
 // Call this function from your Publish button click handler
-export async function handlePublishWithStatus(postData: any, mediaFile: File | null, setStatusMessage: (msg: string) => void) {
+export async function handlePublishWithStatus(postData: any, imageFile: File | null, audioFile: File | null, setStatusMessage: (msg: string) => void) {
   try {
     setStatusMessage('Connecting to Supabase and uploading...');
-    let mediaUrl = null;
+    let imageUrl = null;
+    let audioUrl = null;
 
-    if (mediaFile) {
-      const fileExt = mediaFile.name.split('.').pop();
-      const fileName = `${Date.now()}.${fileExt}`;
-      const filePath = `public/${fileName}`;
-
-      setStatusMessage('Uploading media file...');
+    if (imageFile) {
+      setStatusMessage('Uploading image...');
+      const filePath = `public/${Date.now()}-${imageFile.name}`;
       const { error: storageError } = await supabase.storage
-        .from('posts')
-        .upload(filePath, mediaFile, { cacheControl: '3600', upsert: true });
-
-      if (storageError) {
-        throw new Error(`Storage Error: ${storageError.message}`);
-      }
-
-      const { data: publicUrlData } = supabase.storage
-        .from('posts')
-        .getPublicUrl(filePath);
-
-      mediaUrl = publicUrlData.publicUrl;
+        .from('cover_art')
+        .upload(filePath, imageFile);
+      if (storageError) throw new Error(`Image Upload Error: ${storageError.message}`);
+      const { data } = supabase.storage.from('cover_art').getPublicUrl(filePath);
+      imageUrl = data.publicUrl;
+    }
+    
+    if (audioFile) {
+      setStatusMessage('Uploading audio...');
+      const filePath = `music/${Date.now()}-${audioFile.name}`;
+      const { error: storageError } = await supabase.storage
+        .from('music_files')
+        .upload(filePath, audioFile);
+      if (storageError) throw new Error(`Audio Upload Error: ${storageError.message}`);
+      const { data } = supabase.storage.from('music_files').getPublicUrl(filePath);
+      audioUrl = data.publicUrl;
     }
 
     setStatusMessage('Saving post to database...');
     const payload = {
       title: postData.title,
-      content: postData.content || '',
+      main_artist: postData.mainArtist,
+      featuring: postData.featuring,
+      genre: postData.genre,
       category: postData.category || 'general',
-      image_url: mediaUrl || postData.imageUrl || null,
+      image_url: imageUrl || postData.imageUrl || null,
+      audio_link: audioUrl || postData.audioLink || null,
+      video_link: postData.videoLink,
+      content: postData.body || '',
       created_at: new Date().toISOString()
     };
 
