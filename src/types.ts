@@ -1,0 +1,43 @@
+export interface PostItem {
+  id: string;
+  title: string;
+  subtitle: string;
+  artist: string;
+  featured_artist?: string;
+  genre?: string;
+  category: string;
+  cover: string;
+  image_url: string;
+  date: string;
+  duration?: string;
+  downloads?: string;
+  views?: string;
+  reads?: string;
+  readTime?: string;
+  body: string;
+  content: string;
+  description?: string;
+  lyrics?: string[];
+  audioUrl?: string;
+  audio_url?: string;
+  audio_link?: string;
+  videoUrl?: string;
+  video_url?: string;
+  video_link?: string;
+  isHero?: boolean;
+  spotify_url?: string;
+  apple_music_url?: string;
+  audiomack_url?: string;
+  instagram_url?: string;
+  twitter_url?: string;
+  youtube_url?: string;
+  socials?: {
+    spotify?: string;
+    appleMusic?: string;
+    audiomack?: string;
+    tiktok?: string;
+    instagram?: string;
+    twitter?: string;
+    youtube?: string;
+  };
+}

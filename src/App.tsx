@@ -70,41 +70,11 @@ export {
   handlePublishWithStatus
 };
 
-interface PostItem {
-  id: string;
-  title: string;
-  subtitle: string;
-  artist: string;
-  featured_artist?: string;
-  genre?: string;
-  category: string;
-  cover: string;
-  image_url: string;
-  date: string;
-  duration?: string;
-  downloads?: string;
-  views?: string;
-  reads?: string;
-  readTime?: string;
-  body: string;
-  content: string;
-  description?: string;
-  lyrics?: string[];
-  audioUrl?: string;
-  audio_url?: string;
-  audio_link?: string;
-  videoUrl?: string;
-  video_url?: string;
-  video_link?: string;
-  isHero?: boolean;
-  socials?: {
-    spotify?: string;
-    tiktok?: string;
-    instagram?: string;
-    twitter?: string;
-    youtube?: string;
-  };
-}
+import { PostItem } from './types';
+import { PostCard, FeaturedBanner, MusicFeed, PlayerModal, PostDetail } from './components';
+
+export type { PostItem };
+export { PostCard, FeaturedBanner, MusicFeed, PlayerModal, PostDetail };
 
 // STRICT UNIVERSAL CATEGORY ROUTING:
 // 1. Music feed: shows only category === 'audio' or 'music'
@@ -729,6 +699,14 @@ export default function App() {
 
             const pGenre = p.genre || (finalCat === 'movie' || finalCat === 'video' ? 'Cinema' : finalCat === 'beats' ? 'Beat' : finalCat === 'news' ? 'News' : 'Afrobeats');
 
+            const spotifyLink = p.spotify || p.spotify_url || p.spotify_link || '';
+            const appleLink = p.apple_music || p.apple_music_url || p.apple || p.apple_music_link || '';
+            const audiomackLink = p.audiomack || p.audiomack_url || p.audiomack_link || '';
+            const instaLink = p.instagram || p.instagram_url || p.instagram_handle || '';
+            const twitterLink = p.twitter || p.twitter_url || p.x_url || p.twitter_handle || '';
+            const ytLink = p.youtube || p.youtube_channel || p.youtube_url || '';
+            const tiktokLink = p.tiktok || p.tiktok_url || '';
+
             fetchedPosts.push({
               id: postId,
               title: p.title || 'Untitled Post',
@@ -738,7 +716,7 @@ export default function App() {
               genre: pGenre,
               category: finalCat,
               image_url: imgUrl,
-              cover: imgUrl || 'https://images.unsplash.com/photo-1514525253161-7a46d19cd819?auto=format&fit=crop&w=800&q=80',
+              cover: imgUrl,
               date: p.created_at ? new Date(p.created_at).toLocaleDateString() : (p.date || 'Just now'),
               duration: p.duration || '03:30',
               downloads: p.downloads || '1.2K',
@@ -754,12 +732,20 @@ export default function App() {
               video_url: vidUrl,
               video_link: vidUrl,
               isHero: Boolean(p.is_hero || p.isHero),
+              spotify_url: spotifyLink,
+              apple_music_url: appleLink,
+              audiomack_url: audiomackLink,
+              instagram_url: instaLink,
+              twitter_url: twitterLink,
+              youtube_url: ytLink,
               socials: {
-                spotify: p.spotify || '',
-                tiktok: p.tiktok || '',
-                instagram: p.instagram || '',
-                twitter: p.twitter || '',
-                youtube: p.youtube || p.youtube_channel || p.youtubeChannel || ''
+                spotify: spotifyLink,
+                appleMusic: appleLink,
+                audiomack: audiomackLink,
+                tiktok: tiktokLink,
+                instagram: instaLink,
+                twitter: twitterLink,
+                youtube: ytLink
               }
             });
           }
@@ -2942,74 +2928,16 @@ export default function App() {
                 
                 {/* 3. FEATURED #1 SONG (HERO BANNER) */}
                 {flagshipTrack ? (
-                  <div className="bg-gradient-to-r from-stone-900 via-stone-900 to-amber-950/40 border border-stone-800 rounded-2xl p-6 md:p-8 flex flex-col md:flex-row items-center gap-6 shadow-2xl relative overflow-hidden">
-                    <div className="absolute top-0 right-0 w-96 h-96 bg-amber-500/5 rounded-full blur-3xl pointer-events-none"></div>
-                    <div 
-                      onClick={() => { setSelectedPostId(flagshipTrack.id); setCurrentRoute('post'); }}
-                      className="w-32 h-32 md:w-44 md:h-44 shrink-0 rounded-xl overflow-hidden relative shadow-xl border border-stone-700 cursor-pointer group"
-                    >
-                      <img src={flagshipTrack.image_url || flagshipTrack.cover} alt={flagshipTrack.title} className="w-full h-full object-cover group-hover:scale-105 transition-transform" />
-                      <div className="absolute inset-0 bg-black/20 flex items-center justify-center">
-                        <button
-                          onClick={(e) => { e.stopPropagation(); handlePlayTrack(flagshipTrack); }}
-                          className="w-12 h-12 rounded-full bg-amber-500 hover:bg-amber-400 text-stone-950 flex items-center justify-center shadow-lg transition-transform hover:scale-110"
-                        >
-                          {isPlaying && currentPlayingTrack?.id === flagshipTrack.id ? <Pause className="w-6 h-6 fill-stone-950" /> : <Play className="w-6 h-6 fill-stone-950 ml-0.5" />}
-                        </button>
-                      </div>
-                    </div>
-                    <div className="flex-1 space-y-3 text-center md:text-left">
-                      <div className="flex items-center justify-center md:justify-start gap-2">
-                        <span className="px-3 py-1 rounded-full text-[10px] font-extrabold bg-amber-500 text-stone-950 uppercase tracking-widest flex items-center gap-1">
-                          <Flame className="w-3 h-3 fill-stone-950" /> #1 Featured Trending Song
-                        </span>
-                        <span className="text-xs text-stone-400">{flagshipTrack.date}</span>
-                      </div>
-                      <h2 
-                        onClick={() => { setSelectedPostId(flagshipTrack.id); setCurrentRoute('post'); }}
-                        className="text-2xl md:text-3xl font-black text-white tracking-tight cursor-pointer hover:text-amber-400 transition"
-                      >
-                        {flagshipTrack.title}
-                      </h2>
-                      <div className="flex items-center justify-center md:justify-start gap-1.5 flex-wrap">
-                        <p className="text-sm font-semibold text-amber-400">{flagshipTrack.artist}</p>
-                        {flagshipTrack.featured_artist && (
-                          <span className="text-xs text-stone-400 font-medium">ft. {flagshipTrack.featured_artist}</span>
-                        )}
-                        {flagshipTrack.genre && (
-                          <span className="text-[10px] bg-stone-800 text-stone-300 font-mono px-2 py-0.5 rounded">
-                            {flagshipTrack.genre}
-                          </span>
-                        )}
-                      </div>
-                      <p className="text-xs text-stone-300 line-clamp-2 max-w-2xl" style={{ whiteSpace: 'pre-wrap' }}>{flagshipTrack.content || flagshipTrack.description || flagshipTrack.body}</p>
-                      <div className="flex flex-wrap items-center justify-center md:justify-start gap-3 pt-2">
-                        <button
-                          onClick={() => handlePlayTrack(flagshipTrack)}
-                          className="bg-amber-500 hover:bg-amber-400 text-stone-950 font-bold px-6 py-2.5 rounded-xl text-xs flex items-center gap-2 shadow-lg transition-all"
-                        >
-                          {isPlaying && currentPlayingTrack?.id === flagshipTrack.id ? <Pause className="w-4 h-4 fill-stone-950" /> : <Play className="w-4 h-4 fill-stone-950" />}
-                          Stream / Play Audio
-                        </button>
-                        {(flagshipTrack.audio_url || flagshipTrack.audioUrl) && (
-                          <a
-                            href={flagshipTrack.audio_url || flagshipTrack.audioUrl}
-                            download={`${(flagshipTrack.title || 'afropulse_track').replace(/[^a-z0-9]/gi, '_')}.mp3`}
-                            onClick={(e) => { e.preventDefault(); handleDownloadFile(flagshipTrack); }}
-                            className="bg-stone-800 hover:bg-stone-700 text-amber-400 font-bold px-4 py-2.5 rounded-xl text-xs flex items-center gap-2 transition-all border border-stone-700 cursor-pointer"
-                          >
-                            <Download className="w-4 h-4" /> Download MP3
-                          </a>
-                        )}
-                        <button
-                          onClick={() => { setSelectedPostId(flagshipTrack.id); setCurrentRoute('post'); }}
-                          className="bg-stone-800 hover:bg-stone-700 text-stone-200 font-semibold px-5 py-2.5 rounded-xl text-xs flex items-center gap-2 transition-all border border-stone-700"
-                        >
-                          <FileText className="w-4 h-4 text-amber-400" /> View Post / Read Story
-                        </button>
-                      </div>
-                    </div>
-                  </div>
+                  <FeaturedBanner
+                    post={flagshipTrack}
+                    isPlaying={isPlaying && currentPlayingTrack?.id === flagshipTrack.id}
+                    onPlay={handlePlayTrack}
+                    onDownload={handleDownloadFile}
+                    onSelect={(p) => {
+                      setSelectedPostId(p.id);
+                      setCurrentRoute('post');
+                    }}
+                  />
                 ) : (
                   <div className="bg-stone-900/90 border border-stone-800 rounded-2xl p-8 text-center space-y-3">
                     <Flame className="w-8 h-8 text-amber-400 mx-auto animate-pulse" />
@@ -3050,48 +2978,20 @@ export default function App() {
 
                       <div className="space-y-3.5">
                         {posts
-                          .filter(p => !searchQuery || p.title.toLowerCase().includes(searchQuery.toLowerCase()) || (p.artist || p.subtitle || '').toLowerCase().includes(searchQuery.toLowerCase()))
+                          .filter(p => !searchQuery || p.title.toLowerCase().includes(searchQuery.toLowerCase()) || (p.artist || '').toLowerCase().includes(searchQuery.toLowerCase()) || (p.featured_artist || '').toLowerCase().includes(searchQuery.toLowerCase()))
                           .slice(0, visiblePostLimit)
                           .map(p => (
-                            <div
+                            <PostCard
                               key={p.id}
-                              onClick={() => { setSelectedPostId(p.id); setCurrentRoute('post'); }}
-                              className="flex items-center gap-4 p-3.5 bg-stone-900/90 rounded-xl border border-stone-800/80 hover:border-amber-500/50 transition shadow-sm cursor-pointer"
-                            >
-                              <div className="w-20 h-20 shrink-0 rounded-lg overflow-hidden relative border border-stone-800">
-                                <img src={p.image_url || p.cover} alt={p.title} className="w-full h-full object-cover" />
-                              </div>
-                              <div className="flex-1 min-w-0 space-y-1">
-                                <div className="flex items-center gap-2 flex-wrap">
-                                  <span className={`px-2 py-0.5 rounded text-[9px] font-bold uppercase ${isMusicPost(p) ? 'bg-emerald-500/20 text-emerald-400' : isNewsPost(p) ? 'bg-amber-500/20 text-amber-400' : isBeatsPost(p) ? 'bg-cyan-500/20 text-cyan-400' : 'bg-blue-500/20 text-blue-400'}`}>
-                                    {p.category.toUpperCase()}
-                                  </span>
-                                  {p.genre && (
-                                    <span className="px-1.5 py-0.5 rounded text-[9px] font-medium bg-stone-800 text-stone-300 uppercase font-mono">
-                                      {p.genre}
-                                    </span>
-                                  )}
-                                  <span className="text-[10px] text-stone-400">{p.date}</span>
-                                  <span className="text-[10px] text-stone-500">• {p.downloads || p.views || '12.4K'} views</span>
-                                </div>
-                                <h4 className="text-sm md:text-base font-semibold text-white line-clamp-2 leading-snug">{p.title}</h4>
-                                <div className="flex items-center gap-1.5 text-xs text-stone-400 flex-wrap">
-                                  <span className="text-amber-400 font-semibold">{p.artist}</span>
-                                  {p.featured_artist && (
-                                    <span className="text-stone-400">ft. {p.featured_artist}</span>
-                                  )}
-                                </div>
-                                <p className="text-xs text-stone-400 line-clamp-1" style={{ whiteSpace: 'pre-wrap' }}>
-                                  {p.content || p.description || p.body}
-                                </p>
-                              </div>
-                              <button
-                                onClick={(e) => { e.stopPropagation(); setSelectedPostId(p.id); setCurrentRoute('post'); }}
-                                className="shrink-0 px-3.5 py-2 text-xs font-bold bg-amber-500 hover:bg-amber-400 text-stone-950 rounded-lg shadow"
-                              >
-                                View Post →
-                              </button>
-                            </div>
+                              post={p}
+                              onSelect={(post) => {
+                                setSelectedPostId(post.id);
+                                setCurrentRoute('post');
+                              }}
+                              onPlay={handlePlayTrack}
+                              onDownload={handleDownloadFile}
+                              isPlaying={isPlaying && currentPlayingTrack?.id === p.id}
+                            />
                           ))}
                       </div>
 
@@ -3133,6 +3033,12 @@ export default function App() {
                                   {n.genre && <span className="text-[9px] bg-stone-800 text-stone-300 font-mono px-1.5 py-0.5 rounded uppercase">{n.genre}</span>}
                                 </div>
                                 <h5 className="text-xs font-bold text-white line-clamp-2">{n.title}</h5>
+                                {n.artist && (
+                                  <p className="text-[10px] text-amber-400 font-semibold truncate">
+                                    <span>{n.artist}</span>
+                                    {n.featured_artist && <span className="text-stone-400 ml-1">ft. {n.featured_artist}</span>}
+                                  </p>
+                                )}
                                 <p className="text-[11px] text-stone-400 line-clamp-2" style={{ whiteSpace: 'pre-wrap' }}>{n.content || n.description || n.body}</p>
                               </div>
                             </div>
@@ -4005,72 +3911,17 @@ export default function App() {
 
             {/* ROUTE: MUSIC */}
             {currentRoute === 'music' && (
-              <div className="space-y-6 max-w-4xl mx-auto">
-                <div className="text-center max-w-xl mx-auto space-y-2">
-                  <h2 className="text-3xl font-black text-white">AfroPulse Music Catalog</h2>
-                  <p className="text-xs text-stone-400">Stream and download the latest Nigerian & African hit singles.</p>
-                </div>
-                <div className="space-y-3.5">
-                  {posts.filter(isMusicPost).map(p => (
-                    <div
-                      key={p.id}
-                      onClick={() => { setSelectedPostId(p.id); setCurrentRoute('post'); }}
-                      className="flex items-center gap-4 p-3.5 bg-stone-900/90 rounded-xl border border-stone-800/80 hover:border-amber-500/50 transition shadow-sm cursor-pointer"
-                    >
-                      <div className="w-20 h-20 shrink-0 rounded-lg overflow-hidden relative border border-stone-800">
-                        <img src={p.image_url || p.cover} alt={p.title} className="w-full h-full object-cover" />
-                      </div>
-                      <div className="flex-1 min-w-0 space-y-1">
-                        <div className="flex items-center gap-2 flex-wrap">
-                          <span className="px-2 py-0.5 rounded text-[9px] font-bold uppercase bg-emerald-500/20 text-emerald-400">{p.category.toUpperCase()}</span>
-                          {p.genre && <span className="px-1.5 py-0.5 rounded text-[9px] font-medium bg-stone-800 text-stone-300 uppercase font-mono">{p.genre}</span>}
-                          <span className="text-[10px] text-stone-400">{p.date}</span>
-                          <span className="text-[10px] text-stone-500">• {p.downloads || '14.2K'} downloads</span>
-                        </div>
-                        <h4 className="text-sm md:text-base font-semibold text-white line-clamp-2 leading-snug">{p.title}</h4>
-                        <p className="text-xs text-amber-400 font-semibold truncate">
-                          <span>{p.artist}</span>
-                          {p.featured_artist && <span className="text-stone-400 ml-1">ft. {p.featured_artist}</span>}
-                        </p>
-                        <p className="text-xs text-stone-400 line-clamp-1" style={{ whiteSpace: 'pre-wrap' }}>{p.content || p.description || p.body}</p>
-                      </div>
-                      <div className="shrink-0 flex items-center gap-2">
-                        {(p.audio_url || p.audioUrl) && (
-                          <>
-                            <button
-                              onClick={(e) => { e.stopPropagation(); handlePlayTrack(p); }}
-                              className="p-2.5 bg-stone-800 hover:bg-stone-700 text-amber-400 rounded-lg border border-stone-700"
-                              title="Play / Stream Audio"
-                            >
-                              {isPlaying && currentPlayingTrack?.id === p.id ? <Pause className="w-4 h-4 fill-amber-400" /> : <Play className="w-4 h-4 fill-amber-400 ml-0.5" />}
-                            </button>
-                            <a
-                              href={p.audio_url || p.audioUrl}
-                              download={`${(p.title || 'afropulse_track').replace(/[^a-z0-9]/gi, '_')}.mp3`}
-                              onClick={(e) => { e.stopPropagation(); e.preventDefault(); handleDownloadFile(p); }}
-                              className="p-2.5 bg-amber-500 hover:bg-amber-400 text-stone-950 rounded-lg shadow font-bold cursor-pointer"
-                              title="Download MP3"
-                            >
-                              <Download className="w-4 h-4" />
-                            </a>
-                          </>
-                        )}
-                        <button
-                          onClick={(e) => { e.stopPropagation(); setSelectedPostId(p.id); setCurrentRoute('post'); }}
-                          className="px-3.5 py-2 text-xs font-bold bg-amber-500 hover:bg-amber-400 text-stone-950 rounded-lg shadow"
-                        >
-                          View Post →
-                        </button>
-                      </div>
-                    </div>
-                  ))}
-                  {posts.filter(isMusicPost).length === 0 && (
-                    <div className="text-center py-12 bg-stone-900/50 rounded-2xl border border-stone-800">
-                      <p className="text-sm text-stone-400">No music tracks found in this category yet.</p>
-                    </div>
-                  )}
-                </div>
-              </div>
+              <MusicFeed
+                posts={posts}
+                currentPlayingId={currentPlayingTrack?.id}
+                isPlaying={isPlaying}
+                onSelectPost={(post) => {
+                  setSelectedPostId(post.id);
+                  setCurrentRoute('post');
+                }}
+                onPlayTrack={handlePlayTrack}
+                onDownloadTrack={handleDownloadFile}
+              />
             )}
 
             {/* ROUTE: VIDEOS */}
@@ -4223,259 +4074,32 @@ export default function App() {
               ];
 
               return (
-                <div className="max-w-4xl mx-auto space-y-8 py-4">
-                  <button
-                    onClick={() => setCurrentRoute('home')}
-                    className="flex items-center gap-2 text-xs font-bold text-amber-400 hover:underline"
-                  >
-                    ← Back to Feed
-                  </button>
-
-                  <div className="bg-stone-900 border border-stone-800 rounded-2xl p-6 md:p-8 space-y-6 shadow-xl">
-                    <div className="flex flex-wrap items-center gap-3">
-                      <span className="px-3 py-1 rounded text-xs font-bold bg-amber-500/20 text-amber-400 uppercase">
-                        {post.category}
-                      </span>
-                      {post.genre && (
-                        <span className="px-3 py-1 rounded text-xs font-bold bg-stone-800 text-stone-300 uppercase font-mono">
-                          {post.genre}
-                        </span>
-                      )}
-                      <span className="text-xs text-stone-400">{post.date}</span>
-                      <span className="text-xs text-stone-500">• {post.views || post.downloads || '14.2K'} views</span>
-                    </div>
-
-                    <h1 className="text-2xl md:text-3xl font-black text-white tracking-tight leading-snug">{post.title}</h1>
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <p className="text-sm font-semibold text-amber-400">{post.artist}</p>
-                      {post.featured_artist && (
-                        <span className="text-xs font-medium text-stone-400">ft. {post.featured_artist}</span>
-                      )}
-                    </div>
-
-                    <div className="w-full h-72 md:h-96 rounded-xl overflow-hidden border border-stone-800 shadow-lg">
-                      <img src={post.image_url || post.cover} alt={post.title} className="w-full h-full object-cover" />
-                    </div>
-
-                    <div className="space-y-4 text-stone-300 text-sm leading-relaxed pt-2" style={{ whiteSpace: 'pre-wrap' }}>
-                      <p style={{ whiteSpace: 'pre-wrap' }}>{post.content || post.description || post.body}</p>
-                      {post.lyrics && (
-                        <div className="bg-stone-950 p-4 rounded-xl border border-stone-800 space-y-2 font-mono text-xs text-amber-300/90">
-                          <h5 className="font-bold text-white uppercase text-[10px] tracking-wider mb-2">Lyrics / Verse</h5>
-                          {post.lyrics.map((l, i) => <div key={i}>{l}</div>)}
-                        </div>
-                      )}
-                    </div>
-
-                    {/* MEDIA PLAYER & DOWNLOAD SECTION */}
-                    <div className="bg-stone-950 border border-stone-800 rounded-xl p-6 space-y-4">
-                      <h4 className="text-sm font-bold text-white uppercase tracking-wider">Media Player & Downloads</h4>
-                      {(post.audio_url || post.audioUrl || (post as any).audio_link) ? (
-                        <div className="flex flex-col md:flex-row items-center gap-4 bg-stone-900 p-4 rounded-xl border border-stone-800">
-                          <button
-                            onClick={() => handlePlayTrack(post)}
-                            className="w-14 h-14 rounded-full bg-amber-500 hover:bg-amber-400 text-stone-950 flex items-center justify-center shadow-lg transition-transform hover:scale-105 shrink-0"
-                          >
-                            {isPlaying && currentPlayingTrack?.id === post.id ? <Pause className="w-6 h-6 fill-stone-950" /> : <Play className="w-6 h-6 fill-stone-950 ml-0.5" />}
-                          </button>
-                          <div className="flex-1 text-center md:text-left min-w-0">
-                            <h5 className="text-sm font-bold text-white truncate">{post.title}</h5>
-                            <p className="text-xs text-amber-400 font-semibold">
-                              <span>{post.artist}</span>
-                              {post.featured_artist && <span className="text-stone-400 ml-1">ft. {post.featured_artist}</span>}
-                              <span> • {post.duration || '03:45'}</span>
-                            </p>
-                            {/* Active Audio Stream Player directly mapped to post.audio_url */}
-                            <audio
-                              controls
-                              src={post.audio_url || post.audioUrl || (post as any).audio_link}
-                              className="w-full mt-2 h-9 rounded-lg"
-                            />
-                          </div>
-                          <a
-                            href={post.audio_url || post.audioUrl || (post as any).audio_link}
-                            download={`${(post.title || 'afropulse_track').replace(/[^a-z0-9]/gi, '_')}.mp3`}
-                            onClick={(e) => {
-                              e.preventDefault();
-                              handleDownloadFile(post);
-                            }}
-                            className="bg-amber-500 hover:bg-amber-400 text-stone-950 font-bold px-5 py-2.5 rounded-xl text-xs flex items-center gap-2 shadow transition-transform hover:scale-105 cursor-pointer shrink-0"
-                          >
-                            <Download className="w-4 h-4" /> Download MP3
-                          </a>
-                        </div>
-                      ) : (post.video_url || post.videoUrl || (post as any).video_link) ? (
-                        <div className="space-y-4">
-                          <div className="aspect-video w-full rounded-xl overflow-hidden bg-stone-900 border border-stone-800">
-                            <iframe
-                              src={(post.video_url || post.videoUrl || (post as any).video_link).replace('watch?v=', 'embed/')}
-                              title={post.title}
-                              className="w-full h-full"
-                              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                              allowFullScreen
-                            ></iframe>
-                          </div>
-                          <a
-                            href={post.video_url || post.videoUrl || (post as any).video_link}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="inline-flex items-center gap-2 bg-blue-600 hover:bg-blue-500 text-white font-bold px-5 py-2.5 rounded-xl text-xs"
-                          >
-                            Watch Video Stream / External Premiere ↗
-                          </a>
-                        </div>
-                      ) : (
-                        <div className="text-xs text-stone-400 p-4 bg-stone-900 rounded-xl text-center">
-                          Text article read edition. No media attachment required.
-                        </div>
-                      )}
-                    </div>
-
-                    {/* SHARE BUTTONS SECTION */}
-                    <div className="space-y-3 pt-2">
-                      <h5 className="text-xs font-bold text-stone-300 uppercase tracking-wider">Share This Release</h5>
-                      <div className="flex flex-wrap items-center gap-2">
-                        <button
-                          onClick={() => {
-                            navigator.clipboard.writeText(window.location.href);
-                            setShareCopied(true);
-                            setTimeout(() => setShareCopied(false), 2000);
-                          }}
-                          className="bg-stone-800 hover:bg-stone-700 text-stone-200 px-4 py-2 rounded-xl text-xs font-bold flex items-center gap-1.5 transition"
-                        >
-                          {shareCopied ? '✓ Copied Link!' : '🔗 Copy Link'}
-                        </button>
-                        <a
-                          href={`https://api.whatsapp.com/send?text=${encodeURIComponent(post.title + ' - Listen on AfroPulse: ' + window.location.href)}`}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="bg-emerald-600/20 hover:bg-emerald-600/30 text-emerald-400 border border-emerald-600/30 px-4 py-2 rounded-xl text-xs font-bold flex items-center gap-1.5"
-                        >
-                          🟢 WhatsApp
-                        </a>
-                        <a
-                          href={`https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(window.location.href)}`}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="bg-blue-600/20 hover:bg-blue-600/30 text-blue-400 border border-blue-600/30 px-4 py-2 rounded-xl text-xs font-bold flex items-center gap-1.5"
-                        >
-                          📘 Facebook
-                        </a>
-                        <a
-                          href={`https://twitter.com/intent/tweet?text=${encodeURIComponent(post.title)}&url=${encodeURIComponent(window.location.href)}`}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="bg-sky-600/20 hover:bg-sky-600/30 text-sky-400 border border-sky-600/30 px-4 py-2 rounded-xl text-xs font-bold flex items-center gap-1.5"
-                        >
-                          🕥 X (Twitter)
-                        </a>
-                        <a
-                          href={`https://t.me/share/url?url=${encodeURIComponent(window.location.href)}&text=${encodeURIComponent(post.title)}`}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="bg-indigo-600/20 hover:bg-indigo-600/30 text-indigo-400 border border-indigo-600/30 px-4 py-2 rounded-xl text-xs font-bold flex items-center gap-1.5"
-                        >
-                          ✈️ Telegram
-                        </a>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* RELATED CONTENT */}
-                  {relatedPosts.length > 0 && (
-                    <div className="space-y-4">
-                      <h3 className="text-base font-bold text-white">Related {post.category} Releases</h3>
-                      <div className="space-y-3">
-                        {relatedPosts.map(rp => (
-                          <div
-                            key={rp.id}
-                            onClick={() => { setSelectedPostId(rp.id); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
-                            className="flex items-center gap-4 p-3 bg-stone-900 border border-stone-800 rounded-xl hover:border-amber-500/50 transition cursor-pointer"
-                          >
-                            <img src={rp.image_url || rp.cover} alt={rp.title} className="w-16 h-16 rounded-lg object-cover shrink-0" />
-                            <div className="flex-1 min-w-0 space-y-1">
-                              <h5 className="text-xs font-bold text-white line-clamp-1">{rp.title}</h5>
-                              <p className="text-[11px] text-amber-400 font-medium truncate">
-                                <span>{rp.artist}</span>
-                                {rp.featured_artist && <span className="text-stone-400 ml-1">ft. {rp.featured_artist}</span>}
-                              </p>
-                            </div>
-                            <span className="text-xs text-amber-400 font-bold px-3 py-1 bg-amber-500/10 rounded-lg">View →</span>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-
-                  {/* COMMENTS SECTION */}
-                  <div className="bg-stone-900 border border-stone-800 rounded-2xl p-6 space-y-6">
-                    <h3 className="text-lg font-bold text-white flex items-center gap-2">
-                      <MessageSquare className="w-5 h-5 text-amber-500" /> Comments ({comments.length})
-                    </h3>
-
-                    <form
-                      onSubmit={(e) => {
-                        e.preventDefault();
-                        if (!commentAuthor.trim() || !commentText.trim()) {
-                          alert('Please enter your name and comment');
-                          return;
-                        }
-                        const newC = {
-                          id: 'c-' + Date.now(),
-                          author: commentAuthor,
-                          text: commentText,
-                          date: 'Just now'
-                        };
-                        setPostComments({
-                          ...postComments,
-                          [post.id]: [...comments, newC]
-                        });
-                        setCommentAuthor('');
-                        setCommentText('');
-                        alert('Comment posted successfully!');
-                      }}
-                      className="space-y-4 p-4 bg-stone-950 border border-stone-800 rounded-xl"
-                    >
-                      <h4 className="text-xs font-bold text-amber-400 uppercase">Leave a Comment</h4>
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                        <input
-                          type="text"
-                          required
-                          placeholder="Your Name / Artist Name"
-                          value={commentAuthor}
-                          onChange={(e) => setCommentAuthor(e.target.value)}
-                          className="bg-stone-900 border border-stone-800 rounded-xl px-3 py-2 text-xs text-stone-100"
-                        />
-                      </div>
-                      <textarea
-                        required
-                        rows={3}
-                        placeholder="Write your thoughts or review here..."
-                        value={commentText}
-                        onChange={(e) => setCommentText(e.target.value)}
-                        className="w-full bg-stone-900 border border-stone-800 rounded-xl p-3 text-xs text-stone-100"
-                      ></textarea>
-                      <button
-                        type="submit"
-                        className="bg-amber-500 hover:bg-amber-400 text-stone-950 font-bold px-5 py-2.5 rounded-xl text-xs transition"
-                      >
-                        Post Comment
-                      </button>
-                    </form>
-
-                    <div className="space-y-3">
-                      {comments.map(c => (
-                        <div key={c.id} className="p-4 bg-stone-950 border border-stone-800/80 rounded-xl space-y-1">
-                          <div className="flex items-center justify-between">
-                            <span className="text-xs font-bold text-amber-400">{c.author}</span>
-                            <span className="text-[10px] text-stone-500">{c.date}</span>
-                          </div>
-                          <p className="text-xs text-stone-300">{c.text}</p>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                </div>
+                <PostDetail
+                  post={post}
+                  relatedPosts={relatedPosts}
+                  comments={comments}
+                  isPlaying={isPlaying}
+                  currentPlayingId={currentPlayingTrack?.id}
+                  onBack={() => setCurrentRoute('home')}
+                  onPlayTrack={handlePlayTrack}
+                  onDownloadTrack={handleDownloadFile}
+                  onSelectPost={(id) => {
+                    setSelectedPostId(id);
+                    setCurrentRoute('post');
+                  }}
+                  onAddComment={(author, text) => {
+                    const newC = {
+                      id: 'c-' + Date.now(),
+                      author,
+                      text,
+                      date: 'Just now'
+                    };
+                    setPostComments({
+                      ...postComments,
+                      [post.id]: [...comments, newC]
+                    });
+                  }}
+                />
               );
             })()}
 
@@ -5332,47 +4956,25 @@ export default function App() {
       </footer>
 
       {/* FLOATING AUDIO STREAMING & DOWNLOAD PLAYER BAR */}
-      {currentPlayingTrack && (
-        <aside aria-label="Audio Player" className="fixed bottom-4 left-4 right-4 md:left-auto md:right-8 md:w-96 z-50 bg-stone-900/95 backdrop-blur-md border border-amber-500/40 rounded-2xl p-3.5 shadow-2xl flex items-center gap-3">
-          {(currentPlayingTrack.image_url || currentPlayingTrack.cover) && (
-            <img src={currentPlayingTrack.image_url || currentPlayingTrack.cover} alt={currentPlayingTrack.title} className="w-12 h-12 rounded-xl object-cover shrink-0 border border-stone-800" />
-          )}
-          <div className="flex-1 min-w-0">
-            <h5 className="text-xs font-bold text-white truncate">{currentPlayingTrack.title}</h5>
-            <p className="text-[10px] text-amber-400 font-medium truncate">
-              <span>{currentPlayingTrack.artist}</span>
-              {currentPlayingTrack.featured_artist && <span className="text-stone-400 ml-1">ft. {currentPlayingTrack.featured_artist}</span>}
-            </p>
-          </div>
-          <button
-            onClick={() => handlePlayTrack(currentPlayingTrack)}
-            className="w-9 h-9 rounded-full bg-amber-500 hover:bg-amber-400 text-stone-950 flex items-center justify-center shrink-0 shadow transition-transform hover:scale-105"
-            title={isPlaying ? 'Pause' : 'Play'}
-          >
-            {isPlaying ? <Pause className="w-4 h-4 fill-stone-950" /> : <Play className="w-4 h-4 fill-stone-950 ml-0.5" />}
-          </button>
-          <button
-            onClick={() => handleDownloadFile(currentPlayingTrack)}
-            className="w-9 h-9 rounded-xl bg-stone-800 hover:bg-stone-700 text-amber-400 flex items-center justify-center shrink-0 border border-stone-700 shadow transition-transform hover:scale-105"
-            title="Download MP3"
-          >
-            <Download className="w-4 h-4" />
-          </button>
-          <button
-            onClick={() => {
-              if (audioElement) {
-                audioElement.pause();
-              }
-              setIsPlaying(false);
-              setCurrentPlayingTrack(null);
-            }}
-            className="text-stone-500 hover:text-white p-1 text-xs"
-            title="Close Player"
-          >
-            ✕
-          </button>
-        </aside>
-      )}
+      <PlayerModal
+        track={currentPlayingTrack}
+        isPlaying={isPlaying}
+        onTogglePlay={() => {
+          if (currentPlayingTrack) handlePlayTrack(currentPlayingTrack);
+        }}
+        onDownload={handleDownloadFile}
+        onClose={() => {
+          if (audioElement) {
+            audioElement.pause();
+          }
+          setIsPlaying(false);
+          setCurrentPlayingTrack(null);
+        }}
+        onSelectPost={(track) => {
+          setSelectedPostId(track.id);
+          setCurrentRoute('post');
+        }}
+      />
 
     </main>
   );
