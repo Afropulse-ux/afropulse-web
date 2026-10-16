@@ -1503,7 +1503,6 @@ export default function App() {
         genre: genre,
         category: catNormalized,
         audio_url: finalAudioUrl,
-        videoLink: finalVideoUrl,
         video_url: finalVideoUrl,
         body: content,
         content: content,
