@@ -962,6 +962,7 @@ export default function App() {
   const [middleImageFile, setMiddleImageFile] = useState<File | null>(null);
   const [editingPostId, setEditingPostId] = useState<string | null>(null);
   const [isPublishing, setIsPublishing] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState({ cover: 0, middle: 0, audio: 0, video: 0 });
   const [statusMessage, setStatusMessage] = useState('');
   const [audioFile, setAudioFile] = useState<File | null>(null);
   const [videoFile, setVideoFile] = useState<File | null>(null);
@@ -1428,6 +1429,7 @@ export default function App() {
 
     setIsPublishing(true);
     setStatusMessage('Starting publish...');
+    setUploadProgress({ cover: 0, middle: 0, audio: 0, video: 0 });
 
     try {
       const rawCat = (category || 'music').toLowerCase().trim();
@@ -1446,7 +1448,9 @@ export default function App() {
       let finalImageUrl = imageUrl;
       if (coverFile) {
         setStatusMessage('Uploading cover art...');
+        setUploadProgress(prev => ({ ...prev, cover: 30 }));
         const { data, error } = await supabase.storage.from('cover_art').upload(`${Date.now()}_${coverFile.name}`, coverFile);
+        setUploadProgress(prev => ({ ...prev, cover: 100 }));
         if (data) {
           const { data: publicUrlData } = supabase.storage.from('cover_art').getPublicUrl(data.path);
           finalImageUrl = publicUrlData.publicUrl;
@@ -1457,10 +1461,38 @@ export default function App() {
       let finalMiddleImageUrl = middleImageUrl;
       if (middleImageFile) {
         setStatusMessage('Uploading middle image...');
+        setUploadProgress(prev => ({ ...prev, middle: 30 }));
         const { data, error } = await supabase.storage.from('cover_art').upload(`${Date.now()}_${middleImageFile.name}`, middleImageFile);
+        setUploadProgress(prev => ({ ...prev, middle: 100 }));
         if (data) {
           const { data: publicUrlData } = supabase.storage.from('cover_art').getPublicUrl(data.path);
           finalMiddleImageUrl = publicUrlData.publicUrl;
+        }
+      }
+
+      // Upload audio file if audioFile exists
+      let finalAudioUrl = driveAudioLink || audioUrl;
+      if (audioFile) {
+        setStatusMessage('Uploading audio file...');
+        setUploadProgress(prev => ({ ...prev, audio: 30 }));
+        const { data, error } = await supabase.storage.from('music_files').upload(`${Date.now()}_${audioFile.name}`, audioFile);
+        setUploadProgress(prev => ({ ...prev, audio: 100 }));
+        if (data) {
+          const { data: publicUrlData } = supabase.storage.from('music_files').getPublicUrl(data.path);
+          finalAudioUrl = publicUrlData.publicUrl;
+        }
+      }
+
+      // Upload video file if videoFile exists
+      let finalVideoUrl = youtubeUrl;
+      if (videoFile) {
+        setStatusMessage('Uploading video file...');
+        setUploadProgress(prev => ({ ...prev, video: 30 }));
+        const { data, error } = await supabase.storage.from('cover_art').upload(`${Date.now()}_${videoFile.name}`, videoFile);
+        setUploadProgress(prev => ({ ...prev, video: 100 }));
+        if (data) {
+          const { data: publicUrlData } = supabase.storage.from('cover_art').getPublicUrl(data.path);
+          finalVideoUrl = publicUrlData.publicUrl;
         }
       }
 
@@ -1470,8 +1502,10 @@ export default function App() {
         featured_artist: featuredArtist || '',
         genre: genre,
         category: catNormalized,
-        audioLink: driveAudioLink || audioUrl,
-        videoLink: youtubeUrl,
+        audioLink: finalAudioUrl,
+        audio_url: finalAudioUrl,
+        videoLink: finalVideoUrl,
+        video_url: finalVideoUrl,
         body: content,
         content: content,
         imageUrl: finalImageUrl,
@@ -2115,6 +2149,17 @@ export default function App() {
                                 onChange={(e) => handleFileChange(e, 'uform', 'cover')}
                                 className="w-full text-xs text-stone-400 file:mr-2 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-amber-500 file:text-stone-950 hover:file:bg-amber-400 cursor-pointer"
                               />
+                              {uploadProgress.cover > 0 && (
+                                <div className="space-y-1 pt-1">
+                                  <div className="flex justify-between text-[10px] text-amber-400 font-mono">
+                                    <span>Uploading Cover...</span>
+                                    <span>{uploadProgress.cover}%</span>
+                                  </div>
+                                  <div className="w-full bg-stone-900 rounded-full h-2 overflow-hidden border border-stone-800">
+                                    <div className="bg-amber-500 h-2 transition-all duration-300" style={{ width: `${uploadProgress.cover}%` }}></div>
+                                  </div>
+                                </div>
+                              )}
                             </div>
 
                             {/* Audio File Uploader */}
@@ -2136,6 +2181,17 @@ export default function App() {
                                 onChange={(e) => setUform({ ...uform, driveAudioLink: e.target.value })}
                                 className="w-full bg-stone-900 border border-stone-800 rounded-xl px-3 py-2 text-xs text-stone-100 mt-2"
                               />
+                              {uploadProgress.audio > 0 && (
+                                <div className="space-y-1 pt-1">
+                                  <div className="flex justify-between text-[10px] text-amber-400 font-mono">
+                                    <span>Uploading Audio...</span>
+                                    <span>{uploadProgress.audio}%</span>
+                                  </div>
+                                  <div className="w-full bg-stone-900 rounded-full h-2 overflow-hidden border border-stone-800">
+                                    <div className="bg-amber-500 h-2 transition-all duration-300" style={{ width: `${uploadProgress.audio}%` }}></div>
+                                  </div>
+                                </div>
+                              )}
                             </div>
 
                             {/* Video File Uploader */}
@@ -2150,6 +2206,17 @@ export default function App() {
                                 onChange={(e) => handleFileChange(e, 'uform', 'video')}
                                 className="w-full text-xs text-stone-400 file:mr-2 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-amber-500 file:text-stone-950 hover:file:bg-amber-400 cursor-pointer"
                               />
+                              {uploadProgress.video > 0 && (
+                                <div className="space-y-1 pt-1">
+                                  <div className="flex justify-between text-[10px] text-blue-400 font-mono">
+                                    <span>Uploading Video...</span>
+                                    <span>{uploadProgress.video}%</span>
+                                  </div>
+                                  <div className="w-full bg-stone-900 rounded-full h-2 overflow-hidden border border-stone-800">
+                                    <div className="bg-blue-500 h-2 transition-all duration-300" style={{ width: `${uploadProgress.video}%` }}></div>
+                                  </div>
+                                </div>
+                              )}
                             </div>
                           </div>
 
@@ -2274,10 +2341,10 @@ export default function App() {
                              )}
                              <button
                                type="submit"
-                               disabled={isPublishingPost}
+                               disabled={isPublishing}
                                className="flex-1 bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 disabled:opacity-60 disabled:cursor-not-allowed text-stone-950 font-bold py-3.5 rounded-xl shadow-lg transition-all flex items-center justify-center gap-2"
                              >
-                               {isPublishingPost ? (
+                               {isPublishing ? (
                                  <>
                                    <span className="w-4 h-4 border-2 border-stone-950 border-t-transparent rounded-full animate-spin"></span>
                                    <span>{editingPostId ? 'Updating...' : 'Publishing...'}</span>
