@@ -1396,12 +1396,13 @@ export default function App() {
     }
   };
 
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>, field: string, type: 'cover' | 'audio' | 'video' | 'preview' | 'mp3' | 'wav' | 'stems' | 'adMid' | 'adBottom') => {
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>, field: string, type: 'cover' | 'middle' | 'audio' | 'video' | 'preview' | 'mp3' | 'wav' | 'stems' | 'adMid' | 'adBottom') => {
     const file = e.target.files?.[0];
     if (!file) return;
     const previewUrl = URL.createObjectURL(file);
     if (field === 'uform') {
       if (type === 'cover') { setCoverFile(file); setImageUrl(previewUrl); }
+      if (type === 'middle') { setMiddleImageFile(file); setMiddleImageUrl(previewUrl); }
       if (type === 'audio') setAudioFile(file);
       if (type === 'video') setVideoFile(file);
     } else if (field === 'bform') {
@@ -2303,7 +2304,7 @@ export default function App() {
                                 </tr>
                               </thead>
                               <tbody className="divide-y divide-stone-800">
-                                {posts.map(p => (
+                                { (posts || []).map(p => (
                                   <tr key={p.id} className="hover:bg-stone-950/50">
                                     <td className="p-3 font-mono text-stone-400">#{p.id}</td>
                                     <td className="p-3">
@@ -2321,11 +2322,11 @@ export default function App() {
                                           setArtist(p.artist || '');
                                           setFeaturedArtist(p.featured_artist || '');
                                           setContent(p.content || '');
-                                          setCategory(p.category || 'MUSIC');
+                                          setCategory(p.category || 'news');
+                                          setGenre(p.genre || '');
                                           setImageUrl(p.image_url || '');
                                           setMiddleImageUrl(p.middle_image_url || '');
                                           setAudioUrl(p.audio_url || '');
-                                          setYoutubeUrl(p.video_url || '');
                                           window.scrollTo({ top: 0, behavior: 'smooth' });
                                         }}
                                         className="bg-amber-500/10 hover:bg-amber-500/20 text-amber-400 px-3 py-1.5 rounded-lg font-medium transition-all inline-flex items-center gap-1 mr-2"
@@ -2335,7 +2336,7 @@ export default function App() {
                                       <button
                                         onClick={() => {
                                           if (confirm(`Are you sure you want to delete "${p.title}"?`)) {
-                                            setPosts(posts.filter(item => item.id !== p.id));
+                                            setPosts((posts || []).filter(item => item.id !== p.id));
                                           }
                                         }}
                                         className="bg-red-500/10 hover:bg-red-500/20 text-red-400 px-3 py-1.5 rounded-lg font-medium transition-all inline-flex items-center gap-1"
