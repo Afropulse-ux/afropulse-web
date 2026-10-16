@@ -1502,7 +1502,6 @@ export default function App() {
         featured_artist: featuredArtist || '',
         genre: genre,
         category: catNormalized,
-        audioLink: finalAudioUrl,
         audio_url: finalAudioUrl,
         videoLink: finalVideoUrl,
         video_url: finalVideoUrl,
