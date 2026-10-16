@@ -1507,7 +1507,7 @@ export default function App() {
         video_url: finalVideoUrl,
         body: content,
         content: content,
-        imageUrl: finalImageUrl,
+        image_url: finalImageUrl,
         middle_image_url: finalMiddleImageUrl
       };
 
