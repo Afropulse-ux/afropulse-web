@@ -962,6 +962,7 @@ export default function App() {
   const [middleImageFile, setMiddleImageFile] = useState<File | null>(null);
   const [editingPostId, setEditingPostId] = useState<string | null>(null);
   const [isPublishing, setIsPublishing] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [uploadProgress, setUploadProgress] = useState({ cover: 0, middle: 0, audio: 0, video: 0 });
   const [statusMessage, setStatusMessage] = useState('');
   const [audioFile, setAudioFile] = useState<File | null>(null);
@@ -1420,126 +1421,141 @@ export default function App() {
 
 
 
+  const convertGoogleDriveAudioUrl = (url: string) => {
+    if (!url) return '';
+    const match = url.match(/\/d\/(.*?)\/|\?id=(.*?)(&|$)/);
+    const fileId = match ? (match[1] || match[2]) : null;
+    return fileId ? `https://drive.google.com/uc?export=download&id=${fileId}` : url;
+  };
+
   const handlePublishPost = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!title) {
-      alert('Please enter a title');
-      return;
-    }
-
+    setIsSubmitting(true);
     setIsPublishing(true);
-    setStatusMessage('Starting publish...');
-    setUploadProgress({ cover: 0, middle: 0, audio: 0, video: 0 });
+    setStatusMessage('Processing post submission...');
 
     try {
-      const rawCat = (category || 'music').toLowerCase().trim();
-      let catNormalized = 'audio';
-      if (rawCat === 'video' || rawCat === 'videos' || rawCat === 'movie' || rawCat === 'movies') {
-        catNormalized = 'movie';
-      } else if (rawCat === 'news') {
-        catNormalized = 'news';
-      } else if (rawCat === 'beats' || rawCat === 'beat') {
-        catNormalized = 'beats';
-      } else {
-        catNormalized = 'audio';
-      }
-
-      // Upload image if coverFile exists
-      let finalImageUrl = imageUrl;
+      let uploadedCover = imageUrl;
       if (coverFile) {
-        setStatusMessage('Uploading cover art...');
-        setUploadProgress(prev => ({ ...prev, cover: 30 }));
-        const { data, error } = await supabase.storage.from('cover_art').upload(`${Date.now()}_${coverFile.name}`, coverFile);
-        setUploadProgress(prev => ({ ...prev, cover: 100 }));
-        if (data) {
-          const { data: publicUrlData } = supabase.storage.from('cover_art').getPublicUrl(data.path);
-          finalImageUrl = publicUrlData.publicUrl;
+        setStatusMessage('Uploading cover artwork...');
+        try {
+          const fileExt = coverFile.name.split('.').pop() || 'jpg';
+          const fileName = `${Date.now()}_cover_${Math.random().toString(36).substring(2, 8)}.${fileExt}`;
+          const { data, error } = await supabase.storage.from('cover_art').upload(fileName, coverFile);
+          if (error) console.warn('Cover upload warning:', error.message);
+          if (data) {
+            const { data: publicUrlData } = supabase.storage.from('cover_art').getPublicUrl(data.path);
+            uploadedCover = publicUrlData.publicUrl;
+          }
+        } catch (e) {
+          console.warn('Cover upload notice:', e);
         }
       }
 
-      // Upload middle image if middleImageFile exists
-      let finalMiddleImageUrl = middleImageUrl;
+      let uploadedMiddleImage = middleImageUrl;
       if (middleImageFile) {
         setStatusMessage('Uploading middle image...');
-        setUploadProgress(prev => ({ ...prev, middle: 30 }));
-        const { data, error } = await supabase.storage.from('cover_art').upload(`${Date.now()}_${middleImageFile.name}`, middleImageFile);
-        setUploadProgress(prev => ({ ...prev, middle: 100 }));
-        if (data) {
-          const { data: publicUrlData } = supabase.storage.from('cover_art').getPublicUrl(data.path);
-          finalMiddleImageUrl = publicUrlData.publicUrl;
+        try {
+          const fileExt = middleImageFile.name.split('.').pop() || 'jpg';
+          const fileName = `${Date.now()}_middle_${Math.random().toString(36).substring(2, 8)}.${fileExt}`;
+          const { data, error } = await supabase.storage.from('cover_art').upload(fileName, middleImageFile);
+          if (error) console.warn('Middle image upload warning:', error.message);
+          if (data) {
+            const { data: publicUrlData } = supabase.storage.from('cover_art').getPublicUrl(data.path);
+            uploadedMiddleImage = publicUrlData.publicUrl;
+          }
+        } catch (e) {
+          console.warn('Middle image upload notice:', e);
         }
       }
 
-      // Upload audio file if audioFile exists
-      let finalAudioUrl = driveAudioLink || audioUrl;
+      let uploadedAudio = audioUrl;
       if (audioFile) {
         setStatusMessage('Uploading audio file...');
-        setUploadProgress(prev => ({ ...prev, audio: 30 }));
-        const { data, error } = await supabase.storage.from('music_files').upload(`${Date.now()}_${audioFile.name}`, audioFile);
-        setUploadProgress(prev => ({ ...prev, audio: 100 }));
-        if (data) {
-          const { data: publicUrlData } = supabase.storage.from('music_files').getPublicUrl(data.path);
-          finalAudioUrl = publicUrlData.publicUrl;
+        try {
+          const fileExt = audioFile.name.split('.').pop() || 'mp3';
+          const fileName = `${Date.now()}_audio_${Math.random().toString(36).substring(2, 8)}.${fileExt}`;
+          const { data, error } = await supabase.storage.from('music_files').upload(fileName, audioFile);
+          if (error) console.warn('Audio upload warning:', error.message);
+          if (data) {
+            const { data: publicUrlData } = supabase.storage.from('music_files').getPublicUrl(data.path);
+            uploadedAudio = publicUrlData.publicUrl;
+          }
+        } catch (e) {
+          console.warn('Audio upload notice:', e);
         }
       }
 
-      // Upload video file if videoFile exists
-      let finalVideoUrl = youtubeUrl;
-      if (videoFile) {
-        setStatusMessage('Uploading video file...');
-        setUploadProgress(prev => ({ ...prev, video: 30 }));
-        const { data, error } = await supabase.storage.from('cover_art').upload(`${Date.now()}_${videoFile.name}`, videoFile);
-        setUploadProgress(prev => ({ ...prev, video: 100 }));
-        if (data) {
-          const { data: publicUrlData } = supabase.storage.from('cover_art').getPublicUrl(data.path);
-          finalVideoUrl = publicUrlData.publicUrl;
-        }
-      }
+      const rawAudio = uploadedAudio || audioUrl || driveAudioLink || (uform as any)?.driveAudioLink || '';
+      const finalAudioUrl = convertGoogleDriveAudioUrl(rawAudio.trim());
+      const finalTitle = (title || 'Untitled Post').trim();
+      const finalArtist = (artist || radioArtistName || 'HD Sounz').trim();
+      const finalCategory = (category || 'news').toLowerCase().trim();
+      const finalContent = (content || (uform as any)?.body || '').trim();
+      const finalImageUrl = (uploadedCover || imageUrl || '').trim();
+      const finalMiddleImageUrl = (uploadedMiddleImage || middleImageUrl || '').trim();
+      const finalVideoUrl = (youtubeUrl || (uform as any)?.youtubeUrl || '').trim();
 
-      const postData = {
-        title: title,
-        artist: artist || 'HD Sounz',
-        featured_artist: featuredArtist || '',
-        genre: genre,
-        category: catNormalized,
-        audio_url: finalAudioUrl,
-        video_url: finalVideoUrl,
-        body: content,
-        content: content,
+      const payload: Record<string, any> = {
+        title: finalTitle,
+        artist: finalArtist,
+        featured_artist: featuredArtist ? featuredArtist.trim() : null,
+        category: finalCategory === 'all' ? 'music' : finalCategory,
+        genre: genre ? genre.trim() : null,
+        content: finalContent,
         image_url: finalImageUrl,
-        middle_image_url: finalMiddleImageUrl
+        middle_image_url: finalMiddleImageUrl,
+        audio_url: finalAudioUrl,
+        video_url: finalVideoUrl || null,
+        instagram_handle: (uform as any)?.instagram || null,
+        twitter_handle: (uform as any)?.twitter || null,
+        youtube_link: (uform as any)?.youtubeChannel || null,
+        lyrics: (uform as any)?.lyrics ? [(uform as any).lyrics] : null
       };
 
-      let result;
       if (editingPostId) {
-        result = await supabase.from('posts').update(postData).eq('id', editingPostId);
+        setStatusMessage('Updating post in Supabase...');
+        const { error } = await supabase
+          .from('posts')
+          .update(payload)
+          .eq('id', editingPostId);
+
+        if (error) throw error;
+        alert('Post Updated Successfully!');
       } else {
-        result = await supabase.from('posts').insert([postData]);
+        setStatusMessage('Publishing post to Supabase...');
+        const { error } = await supabase
+          .from('posts')
+          .insert([payload]);
+
+        if (error) throw error;
+        alert('Post Published Successfully!');
       }
 
-      if (result.error) throw new Error(result.error.message);
-      
-      alert('Post ' + (editingPostId ? 'Updated' : 'Published') + ' Successfully!');
-      
-      // Reset form
+      // Reset all form states
       setTitle('');
       setArtist('');
       setFeaturedArtist('');
       setContent('');
+      setCategory('news');
+      setGenre('');
       setImageUrl('');
       setMiddleImageUrl('');
       setAudioUrl('');
       setYoutubeUrl('');
+      setDriveAudioLink('');
       setCoverFile(null);
       setMiddleImageFile(null);
       setAudioFile(null);
+      setVideoFile(null);
       setEditingPostId(null);
-      
+
       await fetchAllSupabaseContent();
       await refreshAdminContent();
-    } catch (error: any) {
-      alert('Publish failed: ' + error.message);
+    } catch (err: any) {
+      alert(`Publish failed: ${err.message}`);
     } finally {
+      setIsSubmitting(false);
       setIsPublishing(false);
       setStatusMessage('');
     }
@@ -2134,8 +2150,8 @@ export default function App() {
                             {/* Cover Artwork Uploader */}
                             <div className="bg-stone-950 border border-stone-800 p-4 rounded-xl text-center space-y-3">
                               <label className="block text-xs font-bold text-stone-300">Cover Artwork (PNG/JPG)</label>
-                              {uform.coverPreview ? (
-                                <img src={uform.coverPreview} alt="" className="w-20 h-20 mx-auto rounded-lg object-cover" />
+                              {imageUrl || (uform as any)?.coverPreview ? (
+                                <img src={imageUrl || (uform as any)?.coverPreview} alt="" className="w-20 h-20 mx-auto rounded-lg object-cover" />
                               ) : (
                                 <div className="w-20 h-20 mx-auto rounded-lg bg-stone-900 border border-dashed border-stone-700 flex items-center justify-center text-stone-500">
                                   <ImageIcon className="w-6 h-6" />
@@ -2174,9 +2190,13 @@ export default function App() {
                               />
                               <input
                                 type="text"
-                                placeholder="Or Google Drive Link"
-                                value={uform.driveAudioLink}
-                                onChange={(e) => setUform({ ...uform, driveAudioLink: e.target.value })}
+                                placeholder="Or Google Drive / Audio Stream Link"
+                                value={audioUrl || driveAudioLink || (uform as any)?.driveAudioLink || ''}
+                                onChange={(e) => {
+                                  setAudioUrl(e.target.value);
+                                  setDriveAudioLink(e.target.value);
+                                  setUform(prev => ({ ...prev, driveAudioLink: e.target.value }));
+                                }}
                                 className="w-full bg-stone-900 border border-stone-800 rounded-xl px-3 py-2 text-xs text-stone-100 mt-2"
                               />
                               {uploadProgress.audio > 0 && (
@@ -2224,8 +2244,11 @@ export default function App() {
                             <input
                               type="text"
                               placeholder="https://www.youtube.com/embed/..."
-                              value={uform.youtubeUrl}
-                              onChange={(e) => setUform({ ...uform, youtubeUrl: e.target.value })}
+                              value={youtubeUrl || (uform as any)?.youtubeUrl || ''}
+                              onChange={(e) => {
+                                setYoutubeUrl(e.target.value);
+                                setUform(prev => ({ ...prev, youtubeUrl: e.target.value }));
+                              }}
                               className="w-full bg-stone-900 border border-stone-800 rounded-xl px-4 py-2.5 text-xs text-stone-100 focus:outline-none focus:border-amber-500"
                             />
                             <p className="text-[10px] text-stone-400">Paste YouTube embed URL or watch link for music videos and movie premieres without heavy file hosting.</p>
@@ -2279,8 +2302,11 @@ export default function App() {
                               <label className="block text-xs font-semibold text-stone-300 mb-1">Rich-Text Description / Body</label>
                               <textarea
                                 rows={4}
-                                value={uform.body}
-                                onChange={(e) => setUform({ ...uform, body: e.target.value })}
+                                value={content || (uform as any)?.body || ''}
+                                onChange={(e) => {
+                                  setContent(e.target.value);
+                                  setUform(prev => ({ ...prev, body: e.target.value }));
+                                }}
                                 placeholder="Enter article summary, song background or press release..."
                                 className="w-full bg-stone-950 border border-stone-800 rounded-xl p-3 text-sm text-stone-100 focus:outline-none focus:border-amber-500"
                               />
@@ -2300,9 +2326,12 @@ export default function App() {
                            {/* Middle Image Uploader */}
                           <div className="bg-stone-950 border border-stone-800 p-4 rounded-xl text-center space-y-3">
                              <label className="block text-xs font-bold text-stone-300">Middle Post Image (Optional)</label>
+                             {middleImageUrl && (
+                               <img src={middleImageUrl} alt="Middle Preview" className="w-20 h-20 mx-auto rounded-lg object-cover border border-stone-800" />
+                             )}
                              <input
                                type="text"
-                               placeholder="Image URL"
+                               placeholder="Image URL or upload file below"
                                value={middleImageUrl}
                                onChange={(e) => setMiddleImageUrl(e.target.value)}
                                className="w-full bg-stone-900 border border-stone-800 rounded-xl px-4 py-2.5 text-xs text-stone-100"
@@ -2311,7 +2340,7 @@ export default function App() {
                                type="file"
                                accept="image/*"
                                onChange={(e) => handleFileChange(e, 'uform', 'middle')}
-                               className="w-full text-xs text-stone-400"
+                               className="w-full text-xs text-stone-400 file:mr-2 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-amber-500 file:text-stone-950 hover:file:bg-amber-400 cursor-pointer"
                              />
                            </div>
                            
@@ -2328,9 +2357,21 @@ export default function App() {
                                  type="button"
                                  onClick={() => {
                                      setEditingPostId(null);
-                                     setTitle(''); setArtist(''); setFeaturedArtist(''); setContent('');
-                                     setImageUrl(''); setMiddleImageUrl(''); setAudioUrl(''); setYoutubeUrl('');
-                                     setCoverFile(null); setMiddleImageFile(null);
+                                     setTitle('');
+                                     setArtist('');
+                                     setFeaturedArtist('');
+                                     setContent('');
+                                     setCategory('news');
+                                     setGenre('');
+                                     setImageUrl('');
+                                     setMiddleImageUrl('');
+                                     setAudioUrl('');
+                                     setYoutubeUrl('');
+                                     setDriveAudioLink('');
+                                     setCoverFile(null);
+                                     setMiddleImageFile(null);
+                                     setAudioFile(null);
+                                     setVideoFile(null);
                                  }}
                                  className="flex-1 bg-stone-800 hover:bg-stone-700 text-white font-bold py-3.5 rounded-xl shadow-lg transition-all"
                                >
@@ -2339,10 +2380,10 @@ export default function App() {
                              )}
                              <button
                                type="submit"
-                               disabled={isPublishing}
+                               disabled={isPublishing || isSubmitting}
                                className="flex-1 bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 disabled:opacity-60 disabled:cursor-not-allowed text-stone-950 font-bold py-3.5 rounded-xl shadow-lg transition-all flex items-center justify-center gap-2"
                              >
-                               {isPublishing ? (
+                               {isPublishing || isSubmitting ? (
                                  <>
                                    <span className="w-4 h-4 border-2 border-stone-950 border-t-transparent rounded-full animate-spin"></span>
                                    <span>{editingPostId ? 'Updating...' : 'Publishing...'}</span>
@@ -2358,62 +2399,83 @@ export default function App() {
                         <div className="bg-stone-900/90 border border-stone-800 rounded-2xl p-6 space-y-4">
                           <h4 className="text-base font-bold text-white">Live Content Manager (Delete & Edit Posts)</h4>
                           <div className="overflow-x-auto">
-                            <table className="w-full text-left text-xs">
-                              <thead className="bg-stone-950 text-stone-400 uppercase tracking-wider border-b border-stone-800">
-                                <tr>
-                                  <th className="p-3">Post ID</th>
-                                  <th className="p-3">Type Badge</th>
-                                  <th className="p-3">Title</th>
-                                  <th className="p-3">Date Posted</th>
-                                  <th className="p-3 text-right">Actions</th>
-                                </tr>
-                              </thead>
-                              <tbody className="divide-y divide-stone-800">
-                                { (posts || []).map(p => (
-                                  <tr key={p.id} className="hover:bg-stone-950/50">
-                                    <td className="p-3 font-mono text-stone-400">#{p.id}</td>
-                                    <td className="p-3">
-                                      <span className="px-2.5 py-1 rounded-full text-[10px] font-bold bg-amber-500/20 text-amber-400">
-                                        {p.category}
-                                      </span>
-                                    </td>
-                                    <td className="p-3 font-semibold text-white">{p.title}</td>
-                                    <td className="p-3 text-stone-400">{p.date}</td>
-                                    <td className="p-3 text-right">
-                                      <button
-                                        onClick={() => {
-                                          setEditingPostId(p.id);
-                                          setTitle(p.title);
-                                          setArtist(p.artist || '');
-                                          setFeaturedArtist(p.featured_artist || '');
-                                          setContent(p.content || '');
-                                          setCategory(p.category || 'news');
-                                          setGenre(p.genre || '');
-                                          setImageUrl(p.image_url || '');
-                                          setMiddleImageUrl(p.middle_image_url || '');
-                                          setAudioUrl(p.audio_url || '');
-                                          window.scrollTo({ top: 0, behavior: 'smooth' });
-                                        }}
-                                        className="bg-amber-500/10 hover:bg-amber-500/20 text-amber-400 px-3 py-1.5 rounded-lg font-medium transition-all inline-flex items-center gap-1 mr-2"
-                                      >
-                                        Edit
-                                      </button>
-                                      <button
-                                        onClick={() => {
-                                          if (confirm(`Are you sure you want to delete "${p.title}"?`)) {
-                                            setPosts((posts || []).filter(item => item.id !== p.id));
-                                          }
-                                        }}
-                                        className="bg-red-500/10 hover:bg-red-500/20 text-red-400 px-3 py-1.5 rounded-lg font-medium transition-all inline-flex items-center gap-1"
-                                      >
-                                        <Trash2 className="w-3.5 h-3.5" />
-                                        Delete
-                                      </button>
-                                    </td>
+                            {Array.isArray(posts) && posts.length > 0 ? (
+                              <table className="w-full text-left text-xs">
+                                <thead className="bg-stone-950 text-stone-400 uppercase tracking-wider border-b border-stone-800">
+                                  <tr>
+                                    <th className="p-3">Post ID</th>
+                                    <th className="p-3">Type Badge</th>
+                                    <th className="p-3">Title</th>
+                                    <th className="p-3">Date Posted</th>
+                                    <th className="p-3 text-right">Actions</th>
                                   </tr>
-                                ))}
-                              </tbody>
-                            </table>
+                                </thead>
+                                <tbody className="divide-y divide-stone-800">
+                                  {posts.map(p => (
+                                    <tr key={p.id} className="hover:bg-stone-950/50">
+                                      <td className="p-3 font-mono text-stone-400">#{p.id}</td>
+                                      <td className="p-3">
+                                        <span className="px-2.5 py-1 rounded-full text-[10px] font-bold bg-amber-500/20 text-amber-400">
+                                          {p.category || 'music'}
+                                        </span>
+                                      </td>
+                                      <td className="p-3 font-semibold text-white">
+                                        <div>{p.title || 'Untitled'}</div>
+                                        <div className="text-[10px] text-stone-400 font-normal">{p.artist || 'Unknown Artist'}</div>
+                                      </td>
+                                      <td className="p-3 text-stone-400">{p.date || 'Recent'}</td>
+                                      <td className="p-3 text-right">
+                                        <button
+                                          type="button"
+                                          onClick={() => {
+                                            setEditingPostId(p.id);
+                                            setTitle(p.title || '');
+                                            setArtist(p.artist || '');
+                                            setFeaturedArtist(p.featured_artist || '');
+                                            setContent(p.content || (p as any).body || '');
+                                            setCategory(p.category || 'news');
+                                            setGenre(p.genre || '');
+                                            setImageUrl(p.image_url || p.cover || '');
+                                            setMiddleImageUrl(p.middle_image_url || '');
+                                            setAudioUrl(p.audio_url || '');
+                                            setYoutubeUrl(p.video_url || '');
+                                            setCoverFile(null);
+                                            setMiddleImageFile(null);
+                                            setAudioFile(null);
+                                            setVideoFile(null);
+                                            window.scrollTo({ top: 0, behavior: 'smooth' });
+                                          }}
+                                          className="bg-amber-500/10 hover:bg-amber-500/20 text-amber-400 px-3 py-1.5 rounded-lg font-medium transition-all inline-flex items-center gap-1 mr-2"
+                                        >
+                                          Edit
+                                        </button>
+                                        <button
+                                          type="button"
+                                          onClick={async () => {
+                                            if (confirm(`Are you sure you want to delete "${p.title || 'Untitled'}"?`)) {
+                                              setPosts((posts || []).filter(item => item.id !== p.id));
+                                              try {
+                                                await supabase.from('posts').delete().eq('id', p.id);
+                                                await fetchAllSupabaseContent();
+                                                await refreshAdminContent();
+                                              } catch (err) {
+                                                console.error('Delete error:', err);
+                                              }
+                                            }
+                                          }}
+                                          className="bg-red-500/10 hover:bg-red-500/20 text-red-400 px-3 py-1.5 rounded-lg font-medium transition-all inline-flex items-center gap-1"
+                                        >
+                                          <Trash2 className="w-3.5 h-3.5" />
+                                          Delete
+                                        </button>
+                                      </td>
+                                    </tr>
+                                  ))}
+                                </tbody>
+                              </table>
+                            ) : (
+                              <p className="text-stone-400 p-6 text-center">No posts found.</p>
+                            )}
                           </div>
                         </div>
 

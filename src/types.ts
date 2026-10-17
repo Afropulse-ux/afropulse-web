@@ -8,6 +8,7 @@ export interface PostItem {
   category: string;
   cover: string;
   image_url: string;
+  middle_image_url?: string;
   date: string;
   duration?: string;
   downloads?: string;

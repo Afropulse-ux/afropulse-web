@@ -43,6 +43,14 @@ export const PostDetail: React.FC<PostDetailProps> = ({
   const youtubeUrl = post.youtube_url || post.socials?.youtube;
   const tiktokUrl = post.socials?.tiktok;
 
+  const convertGoogleDriveAudioUrl = (url?: string) => {
+    if (!url) return '';
+    const match = url.match(/\/d\/(.*?)\/|\?id=(.*?)(&|$)/);
+    const fileId = match ? (match[1] || match[2]) : null;
+    return fileId ? `https://drive.google.com/uc?export=download&id=${fileId}` : url;
+  };
+  const processedAudioUrl = convertGoogleDriveAudioUrl(post.audio_url);
+
   const hasExternalLinks = Boolean(
     spotifyUrl || appleMusicUrl || audiomackUrl || instagramUrl || twitterUrl || youtubeUrl || tiktokUrl
   );
@@ -183,17 +191,17 @@ export const PostDetail: React.FC<PostDetailProps> = ({
                   <span> • {post.duration || '03:45'}</span>
                 </p>
 
-                {/* HTML5 <audio> tag with src directly pointing to post.audio_url */}
+                {/* HTML5 <audio> tag with src directly pointing to audio url */}
                 <audio
                   controls
-                  src={post.audio_url}
+                  src={processedAudioUrl}
                   className="w-full mt-2 h-9 rounded-lg"
                 />
               </div>
 
-              {/* Download MP3 Button directly linked to post.audio_url */}
+              {/* Download MP3 Button directly linked to audio url */}
               <a
-                href={post.audio_url}
+                href={processedAudioUrl}
                 download={`${(post.title || 'afropulse_track').replace(/[^a-z0-9]/gi, '_')}.mp3`}
                 onClick={(e) => {
                   e.preventDefault();
