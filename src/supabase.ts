@@ -186,22 +186,21 @@ export async function deleteSupabaseRecord(
 }
 
 // 8. Helper to convert Google Drive share links to direct download links
-export function convertGoogleDriveLink(link: string): string {
-  if (!link || typeof link !== 'string') return '';
-  const trimmed = link.trim();
-  if (!trimmed) return '';
+// 8. Helper to convert Google Drive share links to direct download links
+export const convertGoogleDriveLink = (url: string | null | undefined): string => {
+  if (!url) return '';
+  
+  // Extract file ID from any Google Drive link variation
+  const match = url.match(/\/file\/d\/([^\/\?]+)|id=([^\&]+)/);
+  const fileId = match ? (match[1] || match[2]) : null;
 
-  const match =
-    trimmed.match(/\/file\/d\/([a-zA-Z0-9_-]+)/) ||
-    trimmed.match(/\/d\/([a-zA-Z0-9_-]+)/) ||
-    trimmed.match(/[?&]id=([a-zA-Z0-9_-]+)/);
-
-  if (match && match[1]) {
-    return `https://drive.google.com/uc?export=download&id=${match[1]}`;
+  if (fileId) {
+    // Direct streamable/downloadable raw file URL
+    return `https://drive.google.com/uc?export=download&id=${fileId}`;
   }
 
-  return trimmed;
-}
+  return url;
+};
 
 // Call this function from your Publish button click handler
 export async function handlePublishWithStatus(postData: any, imageFile: File | null, audioFile: File | null, setStatusMessage: (msg: string) => void) {

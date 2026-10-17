@@ -1488,14 +1488,22 @@ export default function App() {
       const finalTitle = (title || 'Untitled Post').trim();
       const finalArtist = (artist || radioArtistName || 'HD Sounz').trim();
 
-      // 1. CATEGORY FIX: Force category to 'music' whenever publishing from the Music form, ensuring it never defaults to 'news'
-      const rawCategory = (category || '').toLowerCase().trim();
-      const finalCategory = (!rawCategory || rawCategory === 'news' || rawCategory === 'all')
-        ? 'music'
-        : (rawCategory === 'videos' || rawCategory === 'movies' || rawCategory === 'amapiano' ? rawCategory : 'music');
+      // 1. STRICT CATEGORY ROUTING
+      const rawCategory = (category || '').toUpperCase().trim();
+      let finalCategory = 'music'; // Default fallback
+      if (rawCategory === 'MUSIC' || rawCategory === 'AMAPIANO') finalCategory = 'music';
+      else if (rawCategory === 'NEWS') finalCategory = 'news';
+      else if (rawCategory === 'MOVIES') finalCategory = 'movie';
+      else if (rawCategory === 'VIDEOS') finalCategory = 'video';
+      else if (rawCategory === 'BEATS') finalCategory = 'beats';
+      else finalCategory = 'music';
 
       const finalContent = (content || (uform as any)?.body || '').trim();
-      const finalImageUrl = (uploadedCover || imageUrl || '').trim();
+      
+      // 2. RESTORE IMAGE PAYLOAD
+      const coverArt = (uform as any)?.coverPreview || '';
+      const coverUrl = '';
+      const finalImageUrl = (uploadedCover || imageUrl || coverArt || coverUrl || '').trim();
       const finalMiddleImageUrl = (uploadedMiddleImage || middleImageUrl || '').trim();
       const finalVideoUrl = (youtubeUrl || (uform as any)?.youtubeUrl || '').trim();
 
