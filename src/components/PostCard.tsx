@@ -24,31 +24,73 @@ export const PostCard: React.FC<PostCardProps> = ({
   const processedAudioUrl = convertGoogleDriveLink(post.audio_url || post.audioUrl || '');
   const canPlay = (isAudio || isBeats) && Boolean(processedAudioUrl) && processedAudioUrl.startsWith('http');
 
-  // Strictly use post.image_url first without fallback to local mock images
-  const artworkSrc = post.image_url || post.cover || '';
+  // Resolves remote R2 cover art from all possible database column names
+  const artworkSrc = post.cover_art || post.image_url || post.cover_url || post.cover || '';
 
   return (
     <div
       onClick={() => onSelect(post)}
-      className="flex items-center gap-4 p-3.5 bg-stone-900/90 rounded-xl border border-stone-800/80 hover:border-amber-500/50 transition shadow-sm cursor-pointer"
+      className="flex flex-col md:flex-row items-start md:items-center gap-4 p-4 bg-stone-900/90 rounded-xl border border-stone-800/80 hover:border-amber-500/50 transition shadow-sm cursor-pointer w-full mb-3"
     >
-      {/* 2. COVER ARTWORK DISPLAY: Set strictly to post.image_url */}
-      <div className="w-20 h-20 shrink-0 rounded-lg overflow-hidden relative border border-stone-800 bg-stone-950">
-        {artworkSrc ? (
-          <img
-            src={artworkSrc}
-            alt={post.title}
-            className="w-full h-full object-cover"
-            loading="lazy"
-          />
-        ) : (
-          <div className="w-full h-full flex items-center justify-center text-stone-600 text-[10px] uppercase font-bold">
-            No Art
-          </div>
-        )}
+      {/* Top Header Row on Mobile / Left Column on Desktop */}
+      <div className="flex items-center gap-4 w-full md:w-auto shrink-0">
+        {/* Cover Artwork */}
+        <div className="w-20 h-20 shrink-0 rounded-lg overflow-hidden relative border border-stone-800 bg-stone-950">
+          {artworkSrc ? (
+            <img
+              src={artworkSrc}
+              alt={post.title}
+              className="w-full h-full object-cover"
+              loading="lazy"
+            />
+          ) : (
+            <div className="w-full h-full flex items-center justify-center text-stone-600 text-[10px] uppercase font-bold">
+              No Art
+            </div>
+          )}
+        </div>
+
+        {/* Action Buttons for Mobile Screen */}
+        <div className="flex md:hidden items-center gap-2 ml-auto shrink-0">
+          {canPlay && onPlay && (
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                onPlay({ ...post, audio_url: processedAudioUrl });
+              }}
+              className="p-2.5 bg-stone-800 hover:bg-stone-700 text-amber-400 rounded-lg border border-stone-700 transition"
+              title="Stream / Play Track"
+            >
+              {isPlaying ? (
+                <Pause className="w-4 h-4 fill-amber-400" />
+              ) : (
+                <Play className="w-4 h-4 fill-amber-400 ml-0.5" />
+              )}
+            </button>
+          )}
+
+          {canPlay && (
+            <a
+              href={processedAudioUrl}
+              download={`${(post.title || 'afropulse_track').replace(/[^a-z0-9]/gi, '_')}.mp3`}
+              onClick={(e) => {
+                if (onDownload) {
+                  e.stopPropagation();
+                  e.preventDefault();
+                  onDownload({ ...post, audio_url: processedAudioUrl });
+                }
+              }}
+              className="p-2.5 bg-amber-500 hover:bg-amber-400 text-stone-950 rounded-lg shadow font-bold cursor-pointer transition"
+              title="Download MP3"
+            >
+              <Download className="w-4 h-4" />
+            </a>
+          )}
+        </div>
       </div>
 
-      <div className="flex-1 min-w-0 space-y-1">
+      {/* Main Content & Expanded Titles Container */}
+      <div className="flex flex-col flex-1 min-w-0 space-y-1.5 w-full">
         {/* Category & Genre Badges */}
         <div className="flex items-center gap-2 flex-wrap">
           <span
@@ -69,33 +111,34 @@ export const PostCard: React.FC<PostCardProps> = ({
               {post.genre}
             </span>
           )}
-          <span className="text-[10px] text-stone-400">{post.date}</span>
+          {post.date && <span className="text-[10px] text-stone-400">{post.date}</span>}
         </div>
 
-        {/* Post Title */}
-        <h4 className="text-sm md:text-base font-semibold text-white line-clamp-2 leading-snug">
+        {/* Post Title - Full Width & Bold Text */}
+        <h4 className="text-base md:text-lg font-bold text-white break-words whitespace-normal leading-snug w-full">
           {post.title}
         </h4>
 
-        {/* 1. ARTIST & FEATURED ARTIST NAMES: Explicitly post.artist */}
-        <div className="flex items-center gap-1.5 text-xs text-stone-400 flex-wrap">
-          <span className="text-amber-400 font-semibold">{post.artist}</span>
-          {post.featured_artist && post.featured_artist.trim() !== '' && (
-            <span className="text-stone-400 font-medium">ft. {post.featured_artist}</span>
-          )}
-        </div>
+        {/* Artist & Featured Artist Names */}
+        {post.artist && (
+          <div className="flex items-center gap-1.5 text-xs text-stone-400 flex-wrap">
+            <span className="text-amber-400 font-bold">{post.artist}</span>
+            {post.featured_artist && post.featured_artist.trim() !== '' && (
+              <span className="text-stone-300 font-medium">ft. {post.featured_artist}</span>
+            )}
+          </div>
+        )}
 
-        {/* 2. CONTENT DISPLAY: Clean paragraph with pre-wrap */}
-        <p
-          className="text-xs text-stone-400 line-clamp-1"
-          style={{ whiteSpace: 'pre-wrap' }}
-        >
-          {post.content || post.description || post.body}
-        </p>
+        {/* Content Preview */}
+        {(post.content || post.description || post.body) && (
+          <p className="text-xs text-stone-400 line-clamp-2 leading-relaxed">
+            {post.content || post.description || post.body}
+          </p>
+        )}
       </div>
 
-      {/* Action Buttons: Play/Stream & Direct Download */}
-      <div className="shrink-0 flex items-center gap-2">
+      {/* Desktop Action Buttons */}
+      <div className="hidden md:flex shrink-0 items-center gap-2 ml-auto">
         {canPlay && onPlay && (
           <button
             onClick={(e) => {
@@ -113,7 +156,6 @@ export const PostCard: React.FC<PostCardProps> = ({
           </button>
         )}
 
-        {/* 3. AUDIO PLAYER, STREAMING & MP3 DOWNLOADS: Restrict to valid audio/beats */}
         {canPlay && (
           <a
             href={processedAudioUrl}
@@ -131,18 +173,7 @@ export const PostCard: React.FC<PostCardProps> = ({
             <Download className="w-4 h-4" />
           </a>
         )}
-
-        <button
-          onClick={(e) => {
-            e.stopPropagation();
-            onSelect(post);
-          }}
-          className="px-3.5 py-2 text-xs font-bold bg-amber-500 hover:bg-amber-400 text-stone-950 rounded-lg shadow transition"
-        >
-          View Post →
-        </button>
       </div>
     </div>
   );
 };
-export default PostCard;
