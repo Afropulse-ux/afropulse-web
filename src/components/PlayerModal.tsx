@@ -1,6 +1,7 @@
 import React from 'react';
 import { Play, Pause, Download, X } from 'lucide-react';
 import { PostItem } from '../types';
+import { convertGoogleDriveLink } from '../supabase';
 
 interface PlayerModalProps {
   track: PostItem | null;
@@ -23,6 +24,7 @@ export const PlayerModal: React.FC<PlayerModalProps> = ({
 
   // 2. COVER ARTWORK DISPLAY: Set strictly to track.image_url
   const artworkSrc = track.image_url || track.cover || '';
+  const processedAudioUrl = convertGoogleDriveLink(track.audio_url || track.audioUrl || '');
 
   return (
     <aside
@@ -67,14 +69,14 @@ export const PlayerModal: React.FC<PlayerModalProps> = ({
         )}
       </button>
 
-      {/* 3. AUDIO PLAYER, STREAMING & MP3 DOWNLOADS: direct link to track.audio_url */}
-      {track.audio_url && (
+      {/* 3. AUDIO PLAYER, STREAMING & MP3 DOWNLOADS: direct link to processed audio url */}
+      {processedAudioUrl && (
         <a
-          href={track.audio_url}
+          href={processedAudioUrl}
           download={`${(track.title || 'afropulse_track').replace(/[^a-z0-9]/gi, '_')}.mp3`}
           onClick={(e) => {
             e.preventDefault();
-            onDownload(track);
+            onDownload({ ...track, audio_url: processedAudioUrl });
           }}
           className="w-9 h-9 rounded-xl bg-stone-800 hover:bg-stone-700 text-amber-400 flex items-center justify-center shrink-0 border border-stone-700 shadow transition-transform hover:scale-105 cursor-pointer"
           title="Download MP3"

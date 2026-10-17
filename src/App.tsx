@@ -905,11 +905,12 @@ export default function App() {
   };
 
   const handleDownloadFile = async (item: any) => {
-    const url = item.audio_url || item.audioUrl || item.audio_link || item.mediaUrl || item.previewUrl;
-    if (!url) {
+    const rawUrl = item.audio_url || item.audioUrl || item.audio_link || item.mediaUrl || item.previewUrl;
+    if (!rawUrl) {
       alert(`No download link available for "${item?.title || 'this track'}".`);
       return;
     }
+    const url = convertGoogleDriveLink(rawUrl);
     try {
       const response = await fetch(url);
       const blob = await response.blob();
@@ -953,7 +954,7 @@ export default function App() {
   const [artist, setArtist] = useState('');
   const [featuredArtist, setFeaturedArtist] = useState('');
   const [content, setContent] = useState('');
-  const [category, setCategory] = useState('news');
+  const [category, setCategory] = useState('music');
   const [genre, setGenre] = useState('');
   const [imageUrl, setImageUrl] = useState('');
   const [middleImageUrl, setMiddleImageUrl] = useState('');
@@ -1363,11 +1364,12 @@ export default function App() {
   // Helper for playing tracks
   const handlePlayTrack = (track: PostItem | null | undefined) => {
     if (!track) return;
-    const audioSrc = track.audio_url || track.audioUrl || (track as any).audio_link || (track as any).mediaUrl || (track as any).previewUrl;
-    if (!audioSrc) {
+    const rawSrc = track.audio_url || track.audioUrl || (track as any).audio_link || (track as any).mediaUrl || (track as any).previewUrl;
+    if (!rawSrc) {
       alert(`No streaming audio link available for "${track.title || 'this track'}".`);
       return;
     }
+    const audioSrc = convertGoogleDriveLink(rawSrc);
     if (currentPlayingTrack?.id === track.id) {
       if (isPlaying) {
         audioElement?.pause();
@@ -1421,12 +1423,7 @@ export default function App() {
 
 
 
-  const convertGoogleDriveAudioUrl = (url: string) => {
-    if (!url) return '';
-    const match = url.match(/\/d\/(.*?)\/|\?id=(.*?)(&|$)/);
-    const fileId = match ? (match[1] || match[2]) : null;
-    return fileId ? `https://drive.google.com/uc?export=download&id=${fileId}` : url;
-  };
+  const convertGoogleDriveAudioUrl = (url: string) => convertGoogleDriveLink(url);
 
   const handlePublishPost = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -1487,10 +1484,16 @@ export default function App() {
       }
 
       const rawAudio = uploadedAudio || audioUrl || driveAudioLink || (uform as any)?.driveAudioLink || '';
-      const finalAudioUrl = convertGoogleDriveAudioUrl(rawAudio.trim());
+      const finalAudioUrl = convertGoogleDriveLink(rawAudio.trim());
       const finalTitle = (title || 'Untitled Post').trim();
       const finalArtist = (artist || radioArtistName || 'HD Sounz').trim();
-      const finalCategory = (category || 'news').toLowerCase().trim();
+
+      // 1. CATEGORY FIX: Force category to 'music' whenever publishing from the Music form, ensuring it never defaults to 'news'
+      const rawCategory = (category || '').toLowerCase().trim();
+      const finalCategory = (!rawCategory || rawCategory === 'news' || rawCategory === 'all')
+        ? 'music'
+        : (rawCategory === 'videos' || rawCategory === 'movies' || rawCategory === 'amapiano' ? rawCategory : 'music');
+
       const finalContent = (content || (uform as any)?.body || '').trim();
       const finalImageUrl = (uploadedCover || imageUrl || '').trim();
       const finalMiddleImageUrl = (uploadedMiddleImage || middleImageUrl || '').trim();
@@ -1500,7 +1503,7 @@ export default function App() {
         title: finalTitle,
         artist: finalArtist,
         featured_artist: featuredArtist ? featuredArtist.trim() : null,
-        category: finalCategory === 'all' ? 'music' : finalCategory,
+        category: finalCategory,
         genre: genre ? genre.trim() : null,
         content: finalContent,
         image_url: finalImageUrl,
@@ -1537,7 +1540,7 @@ export default function App() {
       setArtist('');
       setFeaturedArtist('');
       setContent('');
-      setCategory('news');
+      setCategory('music');
       setGenre('');
       setImageUrl('');
       setMiddleImageUrl('');
@@ -2361,7 +2364,7 @@ export default function App() {
                                      setArtist('');
                                      setFeaturedArtist('');
                                      setContent('');
-                                     setCategory('news');
+                                     setCategory('music');
                                      setGenre('');
                                      setImageUrl('');
                                      setMiddleImageUrl('');
@@ -2433,7 +2436,7 @@ export default function App() {
                                             setArtist(p.artist || '');
                                             setFeaturedArtist(p.featured_artist || '');
                                             setContent(p.content || (p as any).body || '');
-                                            setCategory(p.category || 'news');
+                                            setCategory(p.category || 'music');
                                             setGenre(p.genre || '');
                                             setImageUrl(p.image_url || p.cover || '');
                                             setMiddleImageUrl(p.middle_image_url || '');

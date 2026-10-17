@@ -1,6 +1,7 @@
 import React from 'react';
 import { Play, Pause, Download, Flame, FileText } from 'lucide-react';
 import { PostItem } from '../types';
+import { convertGoogleDriveLink } from '../supabase';
 
 interface FeaturedBannerProps {
   post: PostItem;
@@ -19,6 +20,7 @@ export const FeaturedBanner: React.FC<FeaturedBannerProps> = ({
 }) => {
   // 2. COVER ARTWORK DISPLAY: Set strictly to post.image_url
   const artworkSrc = post.image_url || post.cover || '';
+  const processedAudioUrl = convertGoogleDriveLink(post.audio_url || post.audioUrl || '');
 
   return (
     <div className="bg-gradient-to-r from-stone-900 via-stone-900 to-amber-950/40 border border-stone-800 rounded-2xl p-6 md:p-8 flex flex-col md:flex-row items-center gap-6 shadow-2xl relative overflow-hidden">
@@ -99,7 +101,7 @@ export const FeaturedBanner: React.FC<FeaturedBannerProps> = ({
         {/* 3. AUDIO PLAYER, STREAMING & MP3 DOWNLOADS */}
         <div className="flex flex-wrap items-center justify-center md:justify-start gap-3 pt-2">
           <button
-            onClick={() => onPlay(post)}
+            onClick={() => onPlay({ ...post, audio_url: processedAudioUrl })}
             className="bg-amber-500 hover:bg-amber-400 text-stone-950 font-bold px-6 py-2.5 rounded-xl text-xs flex items-center gap-2 shadow-lg transition-all"
           >
             {isPlaying ? (
@@ -110,13 +112,13 @@ export const FeaturedBanner: React.FC<FeaturedBannerProps> = ({
             Stream / Play Audio
           </button>
 
-          {post.audio_url && (
+          {processedAudioUrl && (
             <a
-              href={post.audio_url}
+              href={processedAudioUrl}
               download={`${(post.title || 'afropulse_track').replace(/[^a-z0-9]/gi, '_')}.mp3`}
               onClick={(e) => {
                 e.preventDefault();
-                onDownload(post);
+                onDownload({ ...post, audio_url: processedAudioUrl });
               }}
               className="bg-stone-800 hover:bg-stone-700 text-amber-400 font-bold px-4 py-2.5 rounded-xl text-xs flex items-center gap-2 transition-all border border-stone-700 cursor-pointer"
             >

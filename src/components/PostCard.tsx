@@ -1,6 +1,7 @@
 import React from 'react';
 import { Play, Pause, Download } from 'lucide-react';
 import { PostItem } from '../types';
+import { convertGoogleDriveLink } from '../supabase';
 
 interface PostCardProps {
   post: PostItem;
@@ -20,14 +21,8 @@ export const PostCard: React.FC<PostCardProps> = ({
   const cat = (post.category || 'music').toLowerCase().trim();
   const isAudio = cat === 'audio' || cat === 'music';
   const isBeats = cat === 'beats' || cat === 'beat';
-  const canPlay = (isAudio || isBeats) && post.audio_url && post.audio_url.startsWith('http');
-
-  function convertGoogleDriveAudioUrl(url: string) {
-    if (!url) return '';
-    const match = url.match(/\/d\/(.*?)\/|\?id=(.*?)(&|$)/);
-    const fileId = match ? (match[1] || match[2]) : null;
-    return fileId ? `https://drive.google.com/uc?export=download&id=${fileId}` : url;
-  }
+  const processedAudioUrl = convertGoogleDriveLink(post.audio_url || post.audioUrl || '');
+  const canPlay = (isAudio || isBeats) && Boolean(processedAudioUrl) && processedAudioUrl.startsWith('http');
 
   // Strictly use post.image_url first without fallback to local mock images
   const artworkSrc = post.image_url || post.cover || '';
@@ -105,7 +100,7 @@ export const PostCard: React.FC<PostCardProps> = ({
           <button
             onClick={(e) => {
               e.stopPropagation();
-              onPlay(post);
+              onPlay({ ...post, audio_url: processedAudioUrl });
             }}
             className="p-2.5 bg-stone-800 hover:bg-stone-700 text-amber-400 rounded-lg border border-stone-700 transition"
             title="Stream / Play Track"
@@ -121,13 +116,13 @@ export const PostCard: React.FC<PostCardProps> = ({
         {/* 3. AUDIO PLAYER, STREAMING & MP3 DOWNLOADS: Restrict to valid audio/beats */}
         {canPlay && (
           <a
-            href={convertGoogleDriveAudioUrl(post.audio_url)}
+            href={processedAudioUrl}
             download={`${(post.title || 'afropulse_track').replace(/[^a-z0-9]/gi, '_')}.mp3`}
             onClick={(e) => {
               if (onDownload) {
                 e.stopPropagation();
                 e.preventDefault();
-                onDownload({ ...post, audio_url: convertGoogleDriveAudioUrl(post.audio_url) });
+                onDownload({ ...post, audio_url: processedAudioUrl });
               }
             }}
             className="p-2.5 bg-amber-500 hover:bg-amber-400 text-stone-950 rounded-lg shadow font-bold cursor-pointer transition"

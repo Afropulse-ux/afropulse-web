@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Play, Pause, Download, MessageSquare, ExternalLink, Globe, Share2 } from 'lucide-react';
 import { PostItem } from '../types';
+import { convertGoogleDriveLink } from '../supabase';
 
 interface PostDetailProps {
   post: PostItem;
@@ -43,13 +44,7 @@ export const PostDetail: React.FC<PostDetailProps> = ({
   const youtubeUrl = post.youtube_url || post.socials?.youtube;
   const tiktokUrl = post.socials?.tiktok;
 
-  const convertGoogleDriveAudioUrl = (url?: string) => {
-    if (!url) return '';
-    const match = url.match(/\/d\/(.*?)\/|\?id=(.*?)(&|$)/);
-    const fileId = match ? (match[1] || match[2]) : null;
-    return fileId ? `https://drive.google.com/uc?export=download&id=${fileId}` : url;
-  };
-  const processedAudioUrl = convertGoogleDriveAudioUrl(post.audio_url);
+  const processedAudioUrl = convertGoogleDriveLink(post.audio_url || post.audioUrl || '');
 
   const hasExternalLinks = Boolean(
     spotifyUrl || appleMusicUrl || audiomackUrl || instagramUrl || twitterUrl || youtubeUrl || tiktokUrl
@@ -166,11 +161,11 @@ export const PostDetail: React.FC<PostDetailProps> = ({
             Media Player & Downloads
           </h4>
 
-          {post.audio_url ? (
+          {post.audio_url || post.audioUrl ? (
             <div className="flex flex-col md:flex-row items-center gap-4 bg-stone-900 p-4 rounded-xl border border-stone-800">
               {/* Stream / Play Button */}
               <button
-                onClick={() => onPlayTrack(post)}
+                onClick={() => onPlayTrack({ ...post, audio_url: processedAudioUrl })}
                 className="w-14 h-14 rounded-full bg-amber-500 hover:bg-amber-400 text-stone-950 flex items-center justify-center shadow-lg transition-transform hover:scale-105 shrink-0"
                 title="Stream Audio"
               >
@@ -205,7 +200,7 @@ export const PostDetail: React.FC<PostDetailProps> = ({
                 download={`${(post.title || 'afropulse_track').replace(/[^a-z0-9]/gi, '_')}.mp3`}
                 onClick={(e) => {
                   e.preventDefault();
-                  onDownloadTrack(post);
+                  onDownloadTrack({ ...post, audio_url: processedAudioUrl });
                 }}
                 className="bg-amber-500 hover:bg-amber-400 text-stone-950 font-bold px-5 py-2.5 rounded-xl text-xs flex items-center gap-2 shadow transition-transform hover:scale-105 cursor-pointer shrink-0"
               >
