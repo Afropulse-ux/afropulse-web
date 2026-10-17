@@ -19,7 +19,7 @@ interface PostDetailProps {
 export const PostDetail: React.FC<PostDetailProps> = ({
   post,
   relatedPosts,
-  comments,
+  comments = [],
   isPlaying,
   currentPlayingId,
   onBack,
@@ -32,10 +32,10 @@ export const PostDetail: React.FC<PostDetailProps> = ({
   const [commentAuthor, setCommentAuthor] = useState('');
   const [commentText, setCommentText] = useState('');
 
-  // 2. COVER ARTWORK DISPLAY: Set strictly to post.image_url
-  const artworkSrc = post.image_url || post.cover || '';
+  // 1. COVER ARTWORK DISPLAY: Resolves remote Cloudflare R2 artwork across all database fields
+  const artworkSrc = post.cover_art || post.image_url || post.cover_url || post.cover || '';
 
-  // 4. SOCIAL MEDIA & EXTERNAL STREAMING LINKS: Map directly from post object
+  // 2. SOCIAL MEDIA & EXTERNAL STREAMING LINKS
   const spotifyUrl = post.spotify_url || post.socials?.spotify;
   const appleMusicUrl = post.apple_music_url || post.socials?.appleMusic;
   const audiomackUrl = post.audiomack_url || post.socials?.audiomack;
@@ -79,14 +79,14 @@ export const PostDetail: React.FC<PostDetailProps> = ({
         {/* Category, Genre, Date */}
         <div className="flex flex-wrap items-center gap-3">
           <span className="px-3 py-1 rounded text-xs font-bold bg-amber-500/20 text-amber-400 uppercase">
-            {post.category}
+            {post.category || 'MUSIC'}
           </span>
           {post.genre && (
             <span className="px-3 py-1 rounded text-xs font-bold bg-stone-800 text-stone-300 uppercase font-mono">
               {post.genre}
             </span>
           )}
-          <span className="text-xs text-stone-400">{post.date}</span>
+          {post.date && <span className="text-xs text-stone-400">{post.date}</span>}
           <span className="text-xs text-stone-500">
             • {post.views || post.downloads || '14.2K'} views
           </span>
@@ -97,7 +97,7 @@ export const PostDetail: React.FC<PostDetailProps> = ({
           {post.title}
         </h1>
 
-        {/* 1. ARTIST & FEATURED ARTIST NAMES: MUST explicitly render post.artist, NOT post.title */}
+        {/* Artist & Featured Artist */}
         <div className="flex items-center gap-2 flex-wrap">
           <p className="text-sm font-semibold text-amber-400">
             {post.artist || 'AfroPulse Artist'}
@@ -109,7 +109,7 @@ export const PostDetail: React.FC<PostDetailProps> = ({
           )}
         </div>
 
-        {/* 2. COVER ARTWORK DISPLAY: Set strictly to post.image_url */}
+        {/* Cover Artwork Display */}
         <div className="w-full h-72 md:h-96 rounded-xl overflow-hidden border border-stone-800 shadow-lg bg-stone-950">
           {artworkSrc ? (
             <img
@@ -124,7 +124,7 @@ export const PostDetail: React.FC<PostDetailProps> = ({
           )}
         </div>
 
-        {/* 5. TEXT FORMATTING & LINE BREAKS: style={{ whiteSpace: 'pre-wrap' }} */}
+        {/* Text Content */}
         <div
           className="space-y-4 text-stone-300 text-sm leading-relaxed pt-2"
           style={{ whiteSpace: 'pre-wrap' }}
@@ -155,7 +155,7 @@ export const PostDetail: React.FC<PostDetailProps> = ({
           )}
         </div>
 
-        {/* 3. AUDIO PLAYER, STREAMING & MP3 DOWNLOADS */}
+        {/* Audio Player, Streaming & MP3 Downloads */}
         <div className="bg-stone-950 border border-stone-800 rounded-xl p-6 space-y-4">
           <h4 className="text-sm font-bold text-white uppercase tracking-wider">
             Media Player & Downloads
@@ -186,7 +186,6 @@ export const PostDetail: React.FC<PostDetailProps> = ({
                   <span> • {post.duration || '03:45'}</span>
                 </p>
 
-                {/* HTML5 <audio> tag with src directly pointing to audio url */}
                 <audio
                   controls
                   src={processedAudioUrl}
@@ -194,7 +193,7 @@ export const PostDetail: React.FC<PostDetailProps> = ({
                 />
               </div>
 
-              {/* Download MP3 Button directly linked to audio url */}
+              {/* Download MP3 Button */}
               <a
                 href={processedAudioUrl}
                 download={`${(post.title || 'afropulse_track').replace(/[^a-z0-9]/gi, '_')}.mp3`}
@@ -234,7 +233,7 @@ export const PostDetail: React.FC<PostDetailProps> = ({
           )}
         </div>
 
-        {/* 4. SOCIAL MEDIA & EXTERNAL STREAMING LINKS: Active clickable buttons */}
+        {/* Social Media & External Links */}
         {hasExternalLinks && (
           <div className="bg-stone-950 border border-stone-800 rounded-xl p-5 space-y-3">
             <h5 className="text-xs font-bold text-amber-400 uppercase tracking-wider flex items-center gap-1.5">
@@ -316,7 +315,7 @@ export const PostDetail: React.FC<PostDetailProps> = ({
           </div>
         )}
 
-        {/* Share Buttons Section */}
+        {/* Share Buttons */}
         <div className="space-y-3 pt-2">
           <h5 className="text-xs font-bold text-stone-300 uppercase tracking-wider flex items-center gap-1.5">
             <Share2 className="w-3.5 h-3.5 text-stone-400" /> Share This Release
@@ -383,40 +382,42 @@ export const PostDetail: React.FC<PostDetailProps> = ({
             Related {post.category} Releases
           </h3>
           <div className="space-y-3">
-            {relatedPosts.map((rp) => (
-              <div
-                key={rp.id}
-                onClick={() => {
-                  onSelectPost(rp.id);
-                  window.scrollTo({ top: 0, behavior: 'smooth' });
-                }}
-                className="flex items-center gap-4 p-3 bg-stone-900 border border-stone-800 rounded-xl hover:border-amber-500/50 transition cursor-pointer"
-              >
-                <img
-                  src={rp.image_url || rp.cover}
-                  alt={rp.title}
-                  className="w-16 h-16 rounded-lg object-cover shrink-0"
-                />
-                <div className="flex-1 min-w-0 space-y-1">
-                  <h5 className="text-xs font-bold text-white line-clamp-1">{rp.title}</h5>
-                  {/* 1. ARTIST & FEATURED ARTIST NAMES */}
-                  <p className="text-[11px] text-amber-400 font-medium truncate">
-                    <span>{rp.artist || 'AfroPulse Artist'}</span>
-                    {rp.featured_artist && rp.featured_artist.trim() !== '' && (
-                      <span className="text-stone-400 ml-1">ft. {rp.featured_artist}</span>
-                    )}
-                  </p>
+            {relatedPosts.map((rp) => {
+              const rpArt = rp.cover_art || rp.image_url || rp.cover_url || rp.cover || '';
+              return (
+                <div
+                  key={rp.id}
+                  onClick={() => {
+                    onSelectPost(rp.id);
+                    window.scrollTo({ top: 0, behavior: 'smooth' });
+                  }}
+                  className="flex items-center gap-4 p-3 bg-stone-900 border border-stone-800 rounded-xl hover:border-amber-500/50 transition cursor-pointer"
+                >
+                  <img
+                    src={rpArt}
+                    alt={rp.title}
+                    className="w-16 h-16 rounded-lg object-cover shrink-0 bg-stone-950"
+                  />
+                  <div className="flex-1 min-w-0 space-y-1">
+                    <h5 className="text-xs font-bold text-white line-clamp-1">{rp.title}</h5>
+                    <p className="text-[11px] text-amber-400 font-medium truncate">
+                      <span>{rp.artist || 'AfroPulse Artist'}</span>
+                      {rp.featured_artist && rp.featured_artist.trim() !== '' && (
+                        <span className="text-stone-400 ml-1">ft. {rp.featured_artist}</span>
+                      )}
+                    </p>
+                  </div>
+                  <span className="text-xs text-amber-400 font-bold px-3 py-1 bg-amber-500/10 rounded-lg">
+                    View →
+                  </span>
                 </div>
-                <span className="text-xs text-amber-400 font-bold px-3 py-1 bg-amber-500/10 rounded-lg">
-                  View →
-                </span>
-              </div>
-            ))}
+              );
+            })}
           </div>
         </div>
       )}
 
-      {/* Comments Section */}
+      {/* Comments Section - Strictly Database Comments */}
       <div className="bg-stone-900 border border-stone-800 rounded-2xl p-6 space-y-6">
         <h3 className="text-lg font-bold text-white flex items-center gap-2">
           <MessageSquare className="w-5 h-5 text-amber-500" /> Comments ({comments.length})
@@ -454,23 +455,30 @@ export const PostDetail: React.FC<PostDetailProps> = ({
         </form>
 
         <div className="space-y-3">
-          {comments.map((c) => (
-            <div
-              key={c.id}
-              className="p-4 bg-stone-950 border border-stone-800 rounded-xl space-y-1"
-            >
-              <div className="flex items-center justify-between">
-                <span className="text-xs font-bold text-amber-400">{c.author}</span>
-                <span className="text-[10px] text-stone-500">{c.date}</span>
+          {comments && comments.length > 0 ? (
+            comments.map((c) => (
+              <div
+                key={c.id}
+                className="p-4 bg-stone-950 border border-stone-800 rounded-xl space-y-1"
+              >
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-bold text-amber-400">{c.author}</span>
+                  <span className="text-[10px] text-stone-500">{c.date}</span>
+                </div>
+                <p className="text-xs text-stone-300 leading-relaxed" style={{ whiteSpace: 'pre-wrap' }}>
+                  {c.text}
+                </p>
               </div>
-              <p className="text-xs text-stone-300 leading-relaxed" style={{ whiteSpace: 'pre-wrap' }}>
-                {c.text}
-              </p>
-            </div>
-          ))}
+            ))
+          ) : (
+            <p className="text-xs text-stone-500 text-center py-4 bg-stone-950/50 rounded-xl border border-stone-800/50">
+              No comments yet. Be the first to leave a comment!
+            </p>
+          )}
         </div>
       </div>
     </div>
   );
 };
+
 export default PostDetail;
