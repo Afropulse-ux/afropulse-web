@@ -1,80 +1,24 @@
 import React, { useState, useEffect } from 'react';
-import { createClient } from '@supabase/supabase-js';
 import {
-  Play,
-  Pause,
-  Download,
   Search,
-  Upload,
-  Radio,
-  Newspaper,
   Video,
-  Disc,
-  ArrowLeft,
-  CheckCircle,
-  Headphones,
+  Newspaper,
+  Radio,
   Shield,
-  Settings,
-  DollarSign,
-  Users,
-  LogOut,
-  Trash2,
-  Plus,
-  ExternalLink,
-  MessageSquare,
-  Send,
-  Lock,
-  Smartphone,
   Flame,
-  Globe,
-  Share2,
-  FileText,
-  Sliders,
-  Image as ImageIcon,
-  Music as MusicIcon,
-  Video as VideoIcon,
-  Tag,
-  Key as KeyIcon,
-  Activity,
-  Check,
-  Edit2,
-  Save,
-  X,
-  RefreshCw,
-  AlertTriangle,
-  Filter
+  Music as MusicIcon
 } from 'lucide-react';
 
 import {
   supabase,
-  uploadAudioTrack,
-  uploadVideoContent,
-  uploadStorageAsset,
-  fetchSupabaseMusic,
-  fetchSupabaseVideos,
-  updateSupabaseRecord,
-  deleteSupabaseRecord,
-  convertGoogleDriveLink,
-  handlePublishWithStatus
+  convertGoogleDriveLink
 } from './supabase';
-export {
-  supabase,
-  uploadAudioTrack,
-  uploadVideoContent,
-  uploadStorageAsset,
-  fetchSupabaseMusic,
-  fetchSupabaseVideos,
-  updateSupabaseRecord,
-  deleteSupabaseRecord,
-  convertGoogleDriveLink,
-  handlePublishWithStatus
-};
 
 import { PostItem } from './types';
-import { PostCard, FeaturedBanner, MusicFeed, PlayerModal, PostDetail } from './components';
+import { PostCard, FeaturedBanner, PlayerModal, PostDetail } from './components';
 
 export type { PostItem };
-export { PostCard, FeaturedBanner, MusicFeed, PlayerModal, PostDetail };
+export { PostCard, FeaturedBanner, PlayerModal, PostDetail };
 
 export const isMusicPost = (p: { category?: string }) => {
   const cat = (p.category || '').toLowerCase().trim();
@@ -96,49 +40,10 @@ export const isNewsPost = (p: { category?: string }) => {
   return cat === 'news' || cat === 'gossip';
 };
 
-interface BeatItem {
-  id: string;
-  title: string;
-  producer: string;
-  bpm: number;
-  key: string;
-  genre: string;
-  cover: string;
-  previewUrl: string;
-  prices: {
-    mp3: number;
-    wav: number;
-    stems: number;
-    exclusive: number;
-  };
-}
-
-class AdminErrorBoundary extends React.Component<{ children: React.ReactNode }, { hasError: boolean }> {
-  state = { hasError: false };
-  static getDerivedStateFromError() { return { hasError: true }; }
-  componentDidCatch(error: Error) { console.error('Admin Error:', error); }
-  render() {
-    if (this.state.hasError) {
-      return (
-        <div className="min-h-screen bg-[#060504] text-stone-100 flex items-center justify-center p-6">
-          <div className="max-w-md w-full bg-stone-900 border border-stone-800 rounded-2xl p-8 text-center space-y-4">
-            <h3 className="text-lg font-bold text-white">Admin Dashboard Ready</h3>
-            <p className="text-xs text-stone-400">Click below to refresh safely.</p>
-            <button onClick={() => window.location.reload()} className="bg-amber-500 hover:bg-amber-400 text-stone-950 font-bold px-6 py-2.5 rounded-xl text-xs">
-              Refresh Admin Panel
-            </button>
-          </div>
-        </div>
-      );
-    }
-    return this.props.children;
-  }
-}
-
 export default function App() {
   const [currentRoute, setCurrentRoute] = useState<'home' | 'music' | 'videos' | 'news' | 'movies' | 'spotify' | 'promote' | 'musicupload' | 'beatstore' | 'services' | 'contact' | 'privacy' | 'dmca' | 'admin' | 'post' | 'radio-campaign' | 'tiktok-campaign'>('home');
   const [searchQuery, setSearchQuery] = useState('');
-  const [visiblePostLimit, setVisiblePostLimit] = useState(25);
+  const [visiblePostLimit] = useState(25);
   const [selectedPostId, setSelectedPostId] = useState<string | null>(null);
 
   // SUPABASE REAL-TIME COMMENTS STATE
@@ -153,12 +58,11 @@ export default function App() {
   const [adminPassword, setAdminPassword] = useState('');
 
   const [posts, setPosts] = useState<PostItem[]>([]);
-  const [beats, setBeats] = useState<BeatItem[]>([]);
 
   // FETCH REAL COMMENTS FROM SUPABASE
   const fetchCommentsForPost = async (postId: string) => {
     try {
-      const { data, error } = await supabase
+      const { data } = await supabase
         .from('comments')
         .select('*')
         .eq('post_id', postId)
@@ -181,7 +85,7 @@ export default function App() {
   // ADD REAL COMMENT TO SUPABASE
   const handleAddComment = async (postId: string, author: string, text: string) => {
     try {
-      const { data, error } = await supabase
+      const { error } = await supabase
         .from('comments')
         .insert([{ post_id: postId, author_name: author, content: text }]);
 
@@ -310,4 +214,124 @@ export default function App() {
               <div className="hidden md:flex items-center gap-4">
                 <button onClick={() => setCurrentRoute('music')} className="text-xs font-semibold text-stone-300 hover:text-amber-400">Music</button>
                 <button onClick={() => setCurrentRoute('movies')} className="text-xs font-semibold text-stone-300 hover:text-amber-400">Movies</button>
-                <button onClick={() => setCurrentRoute('news')} className="text-xs font-semibold text-stone-300 hover:text-amber-400">News</
+                <button onClick={() => setCurrentRoute('news')} className="text-xs font-semibold text-stone-300 hover:text-amber-400">News</button>
+                <button onClick={() => setCurrentRoute('beatstore')} className="text-xs font-semibold text-stone-300 hover:text-amber-400">Beat Store</button>
+                <button onClick={() => setCurrentRoute('admin')} className="text-xs text-stone-400 bg-stone-900 px-3 py-1.5 rounded-lg border border-stone-800">Admin Panel</button>
+              </div>
+            </div>
+
+            <div className="w-full max-w-2xl relative">
+              <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-stone-400" />
+              <input
+                type="text"
+                placeholder="Search trending songs, music videos, movies, news..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="w-full bg-stone-900/90 border border-stone-800 rounded-full pl-10 pr-4 py-2.5 text-xs text-stone-200 placeholder-stone-500 focus:outline-none focus:border-amber-500/50"
+              />
+            </div>
+          </div>
+        </header>
+      )}
+
+      {/* SERVICE NAVIGATION BUTTONS */}
+      {currentRoute !== 'admin' && (
+        <div className="bg-[#0d0d0d] border-b border-gray-800 py-3">
+          <div className="max-w-6xl mx-auto px-4 grid grid-cols-2 sm:grid-cols-4 md:grid-cols-6 gap-2.5">
+            <button onClick={() => setCurrentRoute('music')} className="px-3 py-2 bg-[#161616] border border-gray-700/70 rounded-xl text-xs font-medium text-white hover:border-amber-500 flex items-center justify-center gap-2">
+              <MusicIcon className="w-4 h-4 text-emerald-400" /> Music
+            </button>
+            <button onClick={() => setCurrentRoute('movies')} className="px-3 py-2 bg-[#161616] border border-gray-700/70 rounded-xl text-xs font-medium text-white hover:border-amber-500 flex items-center justify-center gap-2">
+              <Video className="w-4 h-4 text-blue-400" /> Movies
+            </button>
+            <button onClick={() => setCurrentRoute('videos')} className="px-3 py-2 bg-[#161616] border border-gray-700/70 rounded-xl text-xs font-medium text-white hover:border-amber-500 flex items-center justify-center gap-2">
+              <Play className="w-4 h-4 text-amber-400" /> Music Videos
+            </button>
+            <button onClick={() => setCurrentRoute('news')} className="px-3 py-2 bg-[#161616] border border-gray-700/70 rounded-xl text-xs font-medium text-white hover:border-amber-500 flex items-center justify-center gap-2">
+              <Newspaper className="w-4 h-4 text-amber-500" /> News & Gossip
+            </button>
+            <button onClick={() => setCurrentRoute('beatstore')} className="px-3 py-2 bg-[#161616] border border-gray-700/70 rounded-xl text-xs font-medium text-white hover:border-amber-500 flex items-center justify-center gap-2">
+              <Radio className="w-4 h-4 text-red-400" /> Beat Store
+            </button>
+            <button onClick={() => setCurrentRoute('promote')} className="px-3 py-2 bg-[#161616] border border-gray-700/70 rounded-xl text-xs font-medium text-white hover:border-amber-500 flex items-center justify-center gap-2">
+              <Shield className="w-4 h-4 text-amber-400" /> PR & Promote
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* MAIN CONTENT ROUTING */}
+      <main className="flex-1">
+        {currentRoute === 'home' && (
+          <div className="max-w-7xl mx-auto px-4 py-8 space-y-10">
+            {flagshipTrack && (
+              <FeaturedBanner
+                post={flagshipTrack}
+                isPlaying={isPlaying && currentPlayingTrack?.id === flagshipTrack.id}
+                onPlay={handlePlayTrack}
+                onDownload={handleDownloadFile}
+                onSelect={(p) => { setSelectedPostId(p.id); setCurrentRoute('post'); }}
+              />
+            )}
+
+            <div className="space-y-6">
+              <div className="flex items-center justify-between border-b border-stone-800 pb-3">
+                <h3 className="text-lg font-black tracking-tight text-white flex items-center gap-2">
+                  <Flame className="w-5 h-5 text-amber-500" /> Latest Naija Music & Entertainment Feeds
+                </h3>
+              </div>
+
+              <div className="space-y-3.5">
+                {posts
+                  .filter(p => !searchQuery || p.title.toLowerCase().includes(searchQuery.toLowerCase()) || (p.artist || '').toLowerCase().includes(searchQuery.toLowerCase()))
+                  .slice(0, visiblePostLimit)
+                  .map(p => (
+                    <PostCard
+                      key={p.id}
+                      post={p}
+                      onSelect={(post) => { setSelectedPostId(post.id); setCurrentRoute('post'); }}
+                      onPlay={handlePlayTrack}
+                      onDownload={handleDownloadFile}
+                      isPlaying={isPlaying && currentPlayingTrack?.id === p.id}
+                    />
+                  ))}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {currentRoute === 'post' && selectedPostId && (() => {
+          const post = posts.find(p => p.id === selectedPostId) || posts[0];
+          const relatedPosts = posts.filter(p => p.category === post.category && p.id !== post.id).slice(0, 5);
+          const comments = postComments[post.id] || [];
+
+          return (
+            <div className="max-w-7xl mx-auto px-4 py-8">
+              <PostDetail
+                post={post}
+                relatedPosts={relatedPosts}
+                comments={comments}
+                isPlaying={isPlaying}
+                currentPlayingId={currentPlayingTrack?.id}
+                onBack={() => setCurrentRoute('home')}
+                onPlayTrack={handlePlayTrack}
+                onDownloadTrack={handleDownloadFile}
+                onSelectPost={(id) => { setSelectedPostId(id); setCurrentRoute('post'); }}
+                onAddComment={(author, text) => handleAddComment(post.id, author, text)}
+              />
+            </div>
+          );
+        })()}
+      </main>
+
+      <PlayerModal
+        track={currentPlayingTrack}
+        isPlaying={isPlaying}
+        onTogglePlay={() => { if (currentPlayingTrack) handlePlayTrack(currentPlayingTrack); }}
+        onDownload={handleDownloadFile}
+        onClose={() => { audioElement?.pause(); setIsPlaying(false); setCurrentPlayingTrack(null); }}
+        onSelectPost={(track) => { setSelectedPostId(track.id); setCurrentRoute('post'); }}
+      />
+    </main>
+  );
+}
